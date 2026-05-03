@@ -445,6 +445,11 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
 
       <Section title="Recommendation"><p>{trend.recommendationReason}</p></Section>
 
+      {/* Memory — historical analogs with recorded outcomes. Auto-hides
+          when the brand has no past matching fingerprint with a
+          performanceMultiple. Reuses contentFingerprint. */}
+      <MemorySection trendId={trend.id} />
+
       {/* Outcomes — closes the prediction → ship → measure loop. Visible
           on every trend; operator can update at any time. The reported
           performanceMultiple feeds calibration as a high-fidelity
@@ -484,6 +489,84 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
           Visual Auditor). */}
       <ResearchSummaryStrip research={research} loading={researching} />
     </>
+  );
+}
+
+// ─── Memory section (Trend Memory — historical analogs) ──────────────────
+//
+// Looks up the brand's past trends with the same content fingerprint
+// AND a recorded performanceMultiple. Tells the operator: "Last time
+// a similar trend fired you got 0.4× — too late". Reuses contentFingerprint
+// + performanceMultiple, which the system already records. Pure read.
+interface MemoryAnalog {
+  trendId: string;
+  title: string;
+  source: string;
+  performanceMultiple: number;
+  firstSeenAt: number;
+  peakWindowEnd: number | null;
+  firstActionAt: number | null;
+  hoursVsPeak: number | null;
+  daysAgo: number;
+}
+function MemorySection({ trendId }: { trendId: string }) {
+  const [analogs, setAnalogs] = React.useState<MemoryAnalog[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/trends/${trendId}/memory`)
+      .then(r => r.ok ? r.json() : { analogs: [] })
+      .then(j => { if (!cancelled) setAnalogs(j.analogs ?? []); })
+      .catch(() => { if (!cancelled) setAnalogs([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [trendId]);
+
+  if (loading || !analogs) return null;
+  if (analogs.length === 0) return null;
+
+  // Aggregate stats — most recent analog is the headline; if there are
+  // ≥2 we also show a perf-multiple average.
+  const latest = analogs[0];
+  const avg = analogs.reduce((s, a) => s + a.performanceMultiple, 0) / analogs.length;
+
+  function timingLabel(hoursVsPeak: number | null): { copy: string; tone: 'good' | 'warn' | 'bad' } {
+    if (hoursVsPeak == null) return { copy: 'no action recorded', tone: 'warn' };
+    if (hoursVsPeak < -2)  return { copy: `acted ${Math.abs(hoursVsPeak).toFixed(1)}h ahead of peak`, tone: 'good' };
+    if (hoursVsPeak < 2)   return { copy: 'acted within peak window', tone: 'good' };
+    if (hoursVsPeak < 12)  return { copy: `acted ${hoursVsPeak.toFixed(1)}h after peak`, tone: 'warn' };
+    return { copy: `acted ${hoursVsPeak.toFixed(1)}h after peak — too late`, tone: 'bad' };
+  }
+  const latestTiming = timingLabel(latest.hoursVsPeak);
+  const latestPerfTone =
+    latest.performanceMultiple >= 1.2 ? 'good' :
+    latest.performanceMultiple < 0.8  ? 'bad'  :
+    'neutral';
+
+  return (
+    <Section title={`Memory · ${analogs.length} similar trend${analogs.length === 1 ? '' : 's'} in last 180d`}>
+      <div className="rounded border border-ink-700 bg-ink-800/40 p-2 mb-2">
+        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+          <Chip tone={latestPerfTone} className="text-2xs">
+            <span className="font-mono">{latest.performanceMultiple.toFixed(2)}×</span> perf
+          </Chip>
+          <Chip tone={latestTiming.tone} className="text-2xs">{latestTiming.copy}</Chip>
+          <span className="text-2xs text-ink-400 ml-auto">{latest.daysAgo}d ago</span>
+        </div>
+        <p className="text-2xs text-ink-200 line-clamp-2">{latest.title}</p>
+      </div>
+      {analogs.length > 1 && (
+        <p className="text-2xs text-ink-300">
+          Across all {analogs.length}: avg performance{' '}
+          <span className={`font-mono ${avg >= 1.2 ? 'text-good-400' : avg < 0.8 ? 'text-bad-400' : 'text-ink-100'}`}>
+            {avg.toFixed(2)}×
+          </span>
+          {' '}— {avg >= 1.2 ? 'this lineage usually wins for you, ship faster.' : avg < 0.8 ? 'this lineage usually underperforms, consider skipping.' : 'mixed history.'}
+        </p>
+      )}
+    </Section>
   );
 }
 

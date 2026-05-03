@@ -22,6 +22,8 @@ import { RsshubConnector } from '@/lib/connectors/rsshub';
 import { GoogleTrendsConnector } from '@/lib/connectors/googletrends';
 import { XOfficialConnector } from '@/lib/connectors/x-official';
 import { YoutubeOfficialConnector } from '@/lib/connectors/youtube-official';
+import { XTrendingConnector } from '@/lib/connectors/x-trending';
+import { MetaAdLibraryConnector } from '@/lib/connectors/meta-ads';
 
 let bootstrapped = false;
 
@@ -40,6 +42,8 @@ export function bootstrapConnectors(): void {
   registerClassic(new GoogleTrendsConnector(),   { cadenceSec: 600 });
   registerClassic(new XOfficialConnector(),      { cadenceSec: 60 });  // X v2 → real-time-ish
   registerClassic(new YoutubeOfficialConnector(),{ cadenceSec: 300 });
+  registerClassic(new XTrendingConnector(),      { cadenceSec: 600 }); // trends24-backed; rotates ~every 10min
+  registerClassic(new MetaAdLibraryConnector(),  { cadenceSec: 1800 }); // deep-links per competitor; daily-ish
   // google_alerts already registered via top-of-file `import './google-alerts'`.
 }
 

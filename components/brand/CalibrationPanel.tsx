@@ -56,9 +56,25 @@ export function CalibrationPanel() {
     <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold text-ink-100">Calibration (learned from your actions)</h2>
-        <Button size="sm" variant="outline" onClick={reset} disabled={resetting || !snap || snap.totalEvents === 0}>
-          {resetting ? '… resetting' : '↻ Reset'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/calibration/export"
+            download
+            className={
+              'inline-flex items-center justify-center gap-1.5 rounded-md font-medium ' +
+              'h-11 sm:h-7 px-3 sm:px-2.5 text-sm sm:text-xs ' +
+              'border border-ink-600 text-ink-100 hover:bg-ink-800 ' +
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900 ' +
+              ((!snap || snap.totalEvents === 0) ? 'opacity-40 pointer-events-none' : '')
+            }
+            title="Download all feedback events as CSV"
+          >
+            ↓ CSV
+          </a>
+          <Button size="sm" variant="outline" onClick={reset} disabled={resetting || !snap || snap.totalEvents === 0}>
+            {resetting ? '… resetting' : '↻ Reset'}
+          </Button>
+        </div>
       </div>
       <p className="text-2xs text-ink-300 mb-3">
         Every save / dismiss / approve / reject teaches the system which trends to surface vs hide.
