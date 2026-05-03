@@ -59,6 +59,9 @@ export interface ScoringContext {
   reproductionRate?: number;
   crossSourceCount?: number;
   hoursSinceCompetitorClaim?: number;
+  /** Lineage-Agent-supplied competitor share-of-voice (0..1). Above 0.40,
+   *  saturation gains a graduated contribution per Phase 6.5 spec. */
+  competitorShareOfVoice?: number;
 }
 
 /**

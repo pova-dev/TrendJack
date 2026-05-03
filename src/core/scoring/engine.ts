@@ -61,7 +61,7 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
   const peakWindowEnd = predictPeakWindowEnd(signal);
   const timing = computeTiming(signal, peakWindowEnd, rationale);
   const firstMover = computeFirstMover(ctx.brandPostCountForTrend ?? 0, rationale);
-  const saturation = computeSaturation(signal, rationale);
+  const saturation = computeSaturation(signal, rationale, ctx.competitorShareOfVoice);
   const risk = computeRisk(signal, ctx.brand, rationale);
   const cringe = computeCringe(signal, ctx.brand, rationale);
   const formatFatigue = clamp01(signal.formatFatigue);
@@ -122,6 +122,12 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     timing, firstMover, saturation, risk, cringe, formatFatigue,
     assetEffort, approvalEffort, productionEffort, effort,
     opportunity,
+    // Persisted in the scores JSON blob so the dashboard renders CVS
+    // without needing a separate schema column. Same value as the
+    // top-level ScoreResult.jackingScore — kept in both places for
+    // ergonomic access from both the score() return path and
+    // serialized Trend rows after rowToTrend.
+    jackingScore,
   };
 
   const { recommendation, recommendationReason } = decide(

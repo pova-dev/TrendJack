@@ -85,13 +85,20 @@ describe('full scoring pipeline — Brand-Trend Match regression', () => {
   });
 
   it('Jacking Score gates content generation correctly', () => {
-    // Brand keyword hits with healthy velocity should clear the threshold.
+    // Brand keyword hits with healthy velocity should clear the default
+    // generation gate (0.35).
     const hot = score(BRAND_KEYWORD_HITS[2], { brand: POVA_BRAND }); // POVA Curve unboxing, v=400, r=200k
-    expect(hot.jackingScore).toBeGreaterThan(0.10);
+    expect(hot.jackingScore).toBeGreaterThanOrEqual(0.35);
 
-    // Competitor-only with modest velocity should NOT clear the gate.
+    // Competitor-only with modest velocity may pass the generation gate
+    // (operator should still see them on the board) but should NOT clear
+    // the auto-verify threshold (0.70) — those are reserved for trends
+    // we're confident enough in to burn premium-AI research dollars.
     const cold = score(COMPETITOR_ONLY[3], { brand: POVA_BRAND }); // Realme buds review, v=100, r=40k
-    expect(cold.jackingScore).toBeLessThan(0.50);
+    // Brand-fit is the relevant gate here: competitor-only trends have
+    // brandFit ≤0.55 by topical-fit construction, so CVS = (0.55 × VEL × FM × Sp)
+    // / drag — even with high velocity it should fall short of auto-verify.
+    expect(cold.jackingScore).toBeLessThan(0.70);
   });
 });
 
