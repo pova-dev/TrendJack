@@ -16,6 +16,8 @@ import { InvidiousConnector } from './connectors/invidious';
 import { RsshubConnector } from './connectors/rsshub';
 import { GoogleTrendsConnector } from './connectors/googletrends';
 import { publishBrandTrend } from './realtime/bus';
+import { runScout, fromConnector } from '@/src/agents/scout/runner';
+import { dedupSignals } from '@/src/agents/scout/dedup';
 
 interface IngestResult {
   inserted: number;
@@ -48,32 +50,50 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const connectors = [
-    new RedditLiveConnector(),
-    new HackerNewsConnector(),
-    new GoogleNewsConnector(),
-    new NitterConnector(),
-    new InvidiousConnector(),
-    new RsshubConnector(),
-    new GoogleTrendsConnector(),
-  ];
+  // Phase-3 path: parallel poll via Scout agent + content-fingerprint dedup.
+  // The Scout returns RawSignals already deduplicated within a single tick;
+  // the persistence loop below still uses externalId-based DB dedup so
+  // historical entries (from prior ticks) don't get duplicated either.
+  const scoutReport = await runScout(
+    {
+      brandId,
+      brandName: brand.name,
+      brandKeywords,
+      competitors,
+      themes,
+      since,
+      credentials,
+    },
+    {
+      connectors: [
+        fromConnector(new RedditLiveConnector()),
+        fromConnector(new HackerNewsConnector()),
+        fromConnector(new GoogleNewsConnector()),
+        fromConnector(new NitterConnector()),
+        fromConnector(new InvidiousConnector()),
+        fromConnector(new RsshubConnector()),
+        fromConnector(new GoogleTrendsConnector()),
+      ],
+      perPollTimeoutMs: 15_000,
+      // Don't publish to STREAMS.rawSignals yet — the Filter Agent that
+      // would consume it lands in Phase 4. Until then we score+persist
+      // synchronously here. Keeps behavior identical for the dashboard.
+      dryRun: true,
+    },
+  );
 
   const result: IngestResult = { inserted: 0, updated: 0, bySource: {}, errors: [] };
-  const all: RawSignal[] = [];
-
-  for (const c of connectors) {
-    try {
-      const r = await c.poll({ since, brandKeywords, competitors, themes, limit: 50, credentials });
-      if (!r.ok) {
-        result.errors.push(`${c.id}: ${r.reason}`);
-        continue;
-      }
-      all.push(...r.signals);
-      result.bySource[c.id] = r.signals.length;
-    } catch (e) {
-      result.errors.push(`${c.id}: ${(e as Error).message}`);
+  for (const o of scoutReport.outcomes) {
+    if (o.ok) {
+      result.bySource[o.connectorId] = o.signals.length;
+    } else {
+      result.errors.push(`${o.connectorId}: ${o.reason}`);
     }
   }
+  // Content-fingerprint dedup BEFORE scoring — saves work on duplicates,
+  // and means a cross-posted article on Reddit + News + HN ends up as one
+  // canonical Trend instead of three near-identical cards.
+  const all: RawSignal[] = dedupSignals(scoutReport.signals);
 
   // Score + persist with dedupe.
   for (const s of all) {

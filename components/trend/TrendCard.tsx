@@ -18,17 +18,43 @@ interface Props {
 }
 
 export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, onAction }: Props) {
-  const peak = timeUntil(trend.peakWindowEnd);
+  // ─────────────────────────────────────────────────────────────────────
+  // Hydration-safe time tracking.
+  //
+  // Every wall-clock-derived value (relTime, timeUntil, isDecaying,
+  // NEW/UPDATED chips) drifts between SSR and client hydration: the
+  // server renders at t=0 and the browser hydrates ~1s later, producing
+  // mismatches like "16h 58m left" → "16h 57m left" that React 18 throws
+  // a hydration error for.
+  //
+  // Fix: gate every time-dependent value behind a `now` state initialized
+  // to `null`. Server renders all such values as static placeholders
+  // ('—'); after `useEffect` runs on the client we set `now` to the real
+  // timestamp and the card re-renders with live values. Server and
+  // initial-client renders match exactly.
+  //
+  // The placeholder phase only lasts a single paint frame, so the user
+  // never visually sees the dash in practice.
+  // ─────────────────────────────────────────────────────────────────────
+  const [now, setNow] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    setNow(Date.now());
+    // Refresh every minute so the countdown stays roughly accurate without
+    // re-rendering on every keystroke. Operators don't need second-level
+    // precision on a 16-hour countdown.
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const peak = now != null ? timeUntil(trend.peakWindowEnd) : '—';
   const isHero = trend.recommendation === 'POST_NOW';
 
-  // Compute decay state (past 70% of estimated life) directly from
-  // timestamps, independent of recommendation. Cards in decay should
-  // look visually faded everywhere they appear — Decay Watch column,
-  // search results, the trend drawer — so the operator gets a consistent
-  // "this is past peak" cue.
+  // Decay state — only computed once we're past initial hydration.
   const peakMs  = trend.peakWindowEnd ? new Date(trend.peakWindowEnd).getTime() : 0;
   const startMs = new Date(trend.firstSeenAt).getTime();
-  const lifeRatio = peakMs > startMs ? (Date.now() - startMs) / (peakMs - startMs) : 0;
+  const lifeRatio = (now != null && peakMs > startMs)
+    ? (now - startMs) / (peakMs - startMs)
+    : 0;
   const isDecaying = lifeRatio > 0.7;
   const delta = trend.velocityDelta;
   const showDelta = typeof delta === 'number' && Math.abs(delta) > 0.15;
@@ -80,22 +106,15 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           <SourceIcon source={trend.source} />
           <span className="font-mono uppercase tracking-wide">{sourceLabel(trend.source)}</span>
           <span className="text-ink-500">·</span>
-          {/* relTime + NEW/UPDATED chips both depend on Date.now() — by the
-              time React hydrates on the client, the wall clock has advanced
-              a few ms and the relative-time string can flip ("14m ago" →
-              "13m ago"), causing a hydration mismatch warning. The drift is
-              cosmetic, so we tell React to leave it alone. */}
-          <span suppressHydrationWarning>{relTime(trend.firstSeenAt)}</span>
-          <span suppressHydrationWarning>
-            {(() => {
-              const created = new Date(trend.createdAt).getTime();
-              const updated = new Date(trend.updatedAt).getTime();
-              const tenMinAgo = Date.now() - 10 * 60 * 1000;
-              if (created > tenMinAgo) return <Chip tone="flare" className="!px-1 !py-0 animate-pulse-slow">NEW</Chip>;
-              if (updated > tenMinAgo) return <Chip tone="info"  className="!px-1 !py-0">↻ UPDATED</Chip>;
-              return null;
-            })()}
-          </span>
+          <span>{now != null ? relTime(trend.firstSeenAt) : '—'}</span>
+          {now != null && (() => {
+            const created = new Date(trend.createdAt).getTime();
+            const updated = new Date(trend.updatedAt).getTime();
+            const tenMinAgo = now - 10 * 60 * 1000;
+            if (created > tenMinAgo) return <Chip tone="flare" className="!px-1 !py-0 animate-pulse-slow">NEW</Chip>;
+            if (updated > tenMinAgo) return <Chip tone="info"  className="!px-1 !py-0">↻ UPDATED</Chip>;
+            return null;
+          })()}
         </span>
         <span className="ml-auto flex items-center gap-2 shrink-0 whitespace-nowrap">
           <VelocityIndicator velocity={trend.velocity} />

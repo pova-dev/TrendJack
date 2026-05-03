@@ -153,7 +153,9 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
           <div className="flex items-center gap-2 mt-3">
             <RecommendationBadge rec={trend.recommendation} />
             <span className="text-2xs font-mono text-ink-300">⏱ <span className={peak.expired ? 'text-ink-500' : 'text-flare-400'}>{peak.label}</span></span>
-            <span className="text-2xs font-mono text-ink-300 ml-auto">reach {formatBig(trend.reach)}</span>
+            <span className="text-2xs font-mono text-ink-300 ml-auto">
+              reach {Number(trend.reach) > 0 ? formatBig(Number(trend.reach)) : '—'}
+            </span>
           </div>
           <a href={resolveSourceUrl(trend)} target="_blank" rel="noreferrer noopener"
              className="inline-flex items-center gap-1 mt-2 text-xs text-flare-400 hover:underline">
