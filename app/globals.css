@@ -80,6 +80,22 @@ html, body {
 
 ::selection { background: var(--selection-bg); color: var(--selection-fg); }
 
+/* Reduced-motion respect — global belt-and-suspenders for every
+   transition / animation in the app. Tailwind's `motion-safe:` prefix
+   is used at the component level for fine-grained opt-in, but this
+   media query is the safety net: a user with prefers-reduced-motion
+   set gets minimal-duration transitions even on components that
+   forgot the prefix. Per Visual Auditor §D — every animation runs
+   unconditionally in the previous build. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Scrollbar — slim, theme-aware. */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }

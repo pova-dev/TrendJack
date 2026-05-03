@@ -105,6 +105,16 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
   const [battleLoading, setBattleLoading] = React.useState(false);
   const [battleErr, setBattleErr] = React.useState<string | null>(null);
 
+  // `now` clock for hydration-safe time-derived rendering. Per CLAUDE.md
+  // rule #10 — SSR + initial-client renders use stable placeholders;
+  // useEffect populates the real value post-hydration.
+  const [nowMs, setNowMs] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    setNowMs(Date.now());
+    const t = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   // Deep lineage probe
   const [lineage, setLineage] = React.useState<unknown | null>(null);
   const [probingLineage, setProbingLineage] = React.useState(false);
@@ -216,7 +226,14 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
 
   if (!trend) return <Drawer open={false} onClose={onClose}>{null}</Drawer>;
 
-  const peak = timeUntil(trend.peakWindowEnd);
+  // Hydration-safe `peak` — per CLAUDE.md rule #10, time-derived values
+  // can't be computed in render or SSR will produce different output
+  // than client hydration, throwing the "1 error" toast. Use the
+  // `now` state pattern: render a stable placeholder on SSR + initial
+  // hydration, populate the real value via useEffect.
+  const peak = nowMs != null
+    ? timeUntil(trend.peakWindowEnd)
+    : { label: '—', expired: false };
 
   async function handleGenerate(replace = false, hookId?: string, templateId?: string) {
     if (!trend) return;
@@ -678,18 +695,52 @@ function ResearchSummaryStrip({ research, loading }: {
   );
 }
 
+// Inverted axes — high values are BAD for these. Bar tone flips to red
+// past the 0.5 mark, vs flare-orange for value-positive axes. Per the
+// Visual Auditor §C.2 finding: "every bar is bg-flare-500 regardless of
+// axis polarity — high here is BAD, not good".
+const INVERTED_AXES = new Set(['risk', 'cringe', 'saturation', 'formatFatigue']);
+
+function ScoreBar({ axis, value }: { axis: string; value: number }) {
+  const inverted = INVERTED_AXES.has(axis);
+  // Tone tier: good (low for inverted, high for normal) / warn / bad.
+  const v = inverted ? 1 - value : value;
+  const toneClass =
+    v >= 0.66 ? 'bg-good-500'  :
+    v >= 0.33 ? 'bg-flare-500' :
+                'bg-bad-500';
+  return (
+    <div className="h-1.5 bg-ink-700 rounded overflow-hidden">
+      <div
+        className={cn(
+          'h-full rounded',
+          // Animated width transition so threshold crossings between
+          // probes visibly move rather than snap. motion-safe so users
+          // with reduced-motion preference get the static fill.
+          'motion-safe:transition-[width,background-color] motion-safe:duration-500',
+          toneClass,
+        )}
+        style={{ width: `${Math.round(value * 100)}%` }}
+      />
+    </div>
+  );
+}
+
 function ScoresTab({ trend }: { trend: Trend }) {
   return (
     <div className="space-y-3">
       {trend.rationale.map((r, i) => (
         <div key={i} className="rounded-md border border-ink-700 bg-ink-800/50 p-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="font-mono text-2xs uppercase tracking-wider text-ink-300">{r.axis}</span>
+            <span className="font-mono text-2xs uppercase tracking-wider text-ink-300">
+              {r.axis}
+              {INVERTED_AXES.has(r.axis) && (
+                <span className="ml-1 text-2xs text-ink-500" title="Inverted axis — high values are bad for the brand.">↓bad</span>
+              )}
+            </span>
             <span className="font-mono text-xs tabular-nums text-ink-100">{pct(r.value)}</span>
           </div>
-          <div className="h-1 bg-ink-700 rounded">
-            <div className="h-full bg-flare-500 rounded" style={{ width: pct(r.value) }} />
-          </div>
+          <ScoreBar axis={r.axis} value={r.value} />
           <ul className="mt-2 space-y-0.5 text-2xs text-ink-300">
             {r.reasons.map((rr, j) => <li key={j}>· {rr}</li>)}
           </ul>
