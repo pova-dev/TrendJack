@@ -1,0 +1,333 @@
+// TrendJack V2 schema — multi-tenant SaaS.
+// SQLite for local dev; flip provider to "postgresql" for prod (no schema
+// changes needed — JSON columns are stored as String for cross-DB parity).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Identity & tenancy
+// -----------------------------------------------------------------------------
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  passwordHash  String
+  emailVerified DateTime?
+  createdAt     DateTime      @default(now())
+  memberships   Membership[]
+  auditLogs     AuditLog[]
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  plan        String       @default("free") // free | pro | enterprise
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  brands      Brand[]
+  invites     Invite[]
+  webhooks    Webhook[]
+  telegrams   TelegramConnection[]
+  credentials Credential[]
+  auditLogs   AuditLog[]
+}
+
+model Membership {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role      String       @default("operator") // owner | admin | strategist | operator | approver | viewer
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+model Invite {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email     String
+  role      String       @default("operator")
+  token     String       @unique
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// Brand (one org → many brands)
+// -----------------------------------------------------------------------------
+
+model Brand {
+  id                String        @id @default(cuid())
+  orgId             String
+  org               Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name              String
+  category          String        @default("")
+  markets           String        @default("[]")
+  audience          String        @default("{}")
+  tone              String        @default("{}")
+  bannedTopics      String        @default("[]")
+  /// JSON array of brand-specific keywords + product names. Hits on these
+  /// keywords are what land a trend in the "Brand Matches" column.
+  /// e.g. for POVA: ["pova","tecno pova","pova curve","pova 7","tecno"]
+  brandKeywords     String        @default("[]")
+  safeThemes        String        @default("[]")
+  competitors       String        @default("[]")
+  priorityPlatforms String        @default("[]")
+  contentGoal       String        @default("")
+  riskTolerance     String        @default("medium")
+  approvalMode      String        @default("moderate")
+  crisisMode        Boolean       @default(false)
+  scoringWeights    String        @default("{}")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  trends         Trend[]
+  drafts         Draft[]
+  boards         Board[]
+  alertRules     AlertRule[]
+  connectors     Connector[]
+  approvalRules  ApprovalRule[]
+
+  @@index([orgId])
+}
+
+// -----------------------------------------------------------------------------
+// Trend / Draft (scoped through Brand → Org)
+// -----------------------------------------------------------------------------
+
+model Trend {
+  id                   String   @id @default(cuid())
+  brandId              String
+  brand                Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  source               String
+  sourceRef            String
+  title                String
+  summary              String
+  hashtags             String
+  lineage              String
+  catalyst             String?
+  firstSeenAt          DateTime
+  peakAt               DateTime?
+  peakWindowEnd        DateTime?
+  velocity             Float
+  reach                BigInt
+  sentiment            Float
+  audienceOverlap      Float
+  scores               String
+  rationale            String
+  recommendation       String
+  recommendationReason String
+  competitorClaimed    Boolean  @default(false)
+  competitorClaimants  String   @default("[]")
+  /// True iff one of brand.brandKeywords was found in title/summary/text.
+  /// Powers the Brand Matches column filter (independent of brandFit
+  /// composite score). A "POVA Curve 2 review" article hits this; an
+  /// "OnePlus Buds Ace 3" article does NOT.
+  brandKeywordHit      Boolean  @default(false)
+  /// JSON array of which brand keywords matched (for the rationale UI).
+  matchedBrandKeywords String   @default("[]")
+  formatFatigue        Float
+  examples             String?
+  rawPayload           String?
+  url                  String?
+  pinned               Boolean  @default(false)
+  velocityPrev         Float?
+  velocityDelta        Float?
+  researchCache        String?  // JSON of last research result
+  lineageCache         String?  // JSON of last deep-lineage probe
+  // Performance feedback (populated post-ship)
+  shippedAt            DateTime?
+  postUrl              String?
+  postImpressions      BigInt?
+  postEngagement       BigInt?
+  performanceMultiple  Float?
+  drafts               Draft[]
+  actions              TrendAction[]
+  samples              TrendSample[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([brandId, recommendation])
+  @@index([brandId, firstSeenAt])
+}
+
+/// Time-series snapshots of trend metrics. We append a sample on every
+/// ingest where a trend was seen — UI sparklines and growth analysis show
+/// momentum across hours / days / weeks / months.
+model TrendSample {
+  id          String   @id @default(cuid())
+  trendId     String
+  trend       Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  sampledAt   DateTime @default(now())
+  velocity    Float
+  reach       BigInt
+  sentiment   Float
+  opportunity Int
+  source      String
+
+  @@index([trendId, sampledAt])
+}
+
+model Draft {
+  id           String   @id @default(cuid())
+  trendId      String
+  trend        Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  variant      String
+  platform     String
+  hook         String
+  body         String
+  cta          String?
+  visualBrief  String?
+  whyItWorks   String?
+  whatNotToSay String?
+  cringeScore  Float
+  status       String
+  assignee     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TrendAction {
+  id        String   @id @default(cuid())
+  trendId   String
+  trend     Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  type      String
+  actor     String
+  payload   String?
+  createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// Boards / columns (per user, per brand)
+// -----------------------------------------------------------------------------
+
+model Board {
+  id        String   @id @default(cuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  ownerId   String
+  name      String
+  columns   String
+  shared    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brandId])
+  @@index([ownerId])
+}
+
+// -----------------------------------------------------------------------------
+// Alerts, Approvals, Connectors, Webhooks
+// -----------------------------------------------------------------------------
+
+model AlertRule {
+  id        String   @id @default(cuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name      String
+  condition String
+  threshold String
+  channel   String
+  active    Boolean  @default(true)
+}
+
+model ApprovalRule {
+  id        String   @id @default(cuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  // e.g. "risk > 0.5 OR variant = 'bold'"
+  condition String
+  // routing target: slack channel, user email, or external URL
+  routeType String   // slack | email | webhook
+  routeTo   String
+  priority  Int      @default(2) // 0..3, lower is higher priority
+  active    Boolean  @default(true)
+}
+
+model Connector {
+  id        String       @id @default(cuid())
+  brandId   String
+  brand     Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  source    String
+  mode      String
+  authBlob  String?
+  config    String       @default("{}")
+  lastRunAt DateTime?
+  lastError String?
+  active    Boolean      @default(true)
+}
+
+model TelegramConnection {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String       @default("Default")
+  botToken      String
+  defaultChatId String
+  events        String       @default("[]") // JSON array of subscribed events
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  @@index([orgId])
+}
+
+model Webhook {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  url       String
+  events    String       // JSON array of events to fire on, e.g. ["trend.post_now","draft.shipped"]
+  secret    String?
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+}
+
+/// Encrypted org-level credentials. `value` is AES-256-GCM ciphertext; the
+/// envelope encoding (iv|tag|ciphertext, base64) is in lib/security/crypto.ts.
+/// `scope` lets us namespace keys by purpose:
+///   - `connector` (X_BEARER_TOKEN, YOUTUBE_API_KEY, NITTER_INSTANCES, …)
+///   - `ai`        (ANTHROPIC_API_KEY, OPENROUTER_API_KEY, TJ_MODEL_*, …)
+///   - `research`  (TAVILY_API_KEY, BRAVE_API_KEY, …)
+///   - `integration` (SLACK_BOT_TOKEN if needed, …)
+model Credential {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scope     String
+  key       String
+  value     String       // AES-GCM ciphertext, base64-encoded
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([orgId, scope, key])
+  @@index([orgId, scope])
+}
+
+model AuditLog {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String       // brand.update, trend.dismiss, draft.approve, …
+  target    String?      // entity id this action affected
+  meta      String?      // JSON
+  createdAt DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+}

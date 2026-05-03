@@ -1,0 +1,46 @@
+name: ✨ Feature / connector request
+description: New connector, new column type, new integration, new scoring axis, etc.
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want?
+      description: One paragraph. What feature or capability is missing?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: What workflow does this unlock? Who benefits?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Connector (new platform)
+        - AI provider / model
+        - Research backend
+        - Integration (Slack/Telegram/Notion/etc)
+        - Column type / filter
+        - Scoring engine
+        - UI / dashboard
+        - Multi-tenant / auth
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: api-or-source
+    attributes:
+      label: API / source notes
+      description: If this is a new connector or research backend, paste the relevant docs URL + auth model + free-tier limits.
+  - type: checkboxes
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to send a PR?
+      options:
+        - label: Yes, I want to build this

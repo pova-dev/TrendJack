@@ -1,0 +1,64 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+/test-results
+
+# next.js
+/.next/
+/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# environment — DO NOT COMMIT
+.env
+.env*.local
+.env.production
+.env.development.local
+
+# database (sqlite)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+prisma/*.db
+prisma/migrations/dev/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+
+# logs
+logs/
+*.log
+
+# build artifacts
+dist/
+.turbo/
+.vercel/
+.netlify/
+
+# uploads / runtime data
+uploads/
+public/uploads/
+
+# generated
+prisma/generated/

@@ -1,0 +1,82 @@
+# Single-command self-host. Brings up TrendJack with persistent SQLite
+# storage on a named volume. Run `docker compose up -d` and visit
+# http://localhost:3000.
+#
+# For Postgres in prod, uncomment the postgres service block + change
+# DATABASE_URL accordingly + flip prisma/schema.prisma provider to
+# "postgresql".
+
+services:
+  app:
+    build: .
+    image: trendjack:latest
+    container_name: trendjack
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Required — must be 32+ chars. Generate: openssl rand -hex 32
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set in .env or shell}
+      DATABASE_URL:  ${DATABASE_URL:-file:/data/dev.db}
+      NODE_ENV: production
+      # AI providers (any one is enough; OpenRouter is recommended)
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY:     ${GOOGLE_API_KEY:-}
+      # Web research
+      TAVILY_API_KEY:     ${TAVILY_API_KEY:-}
+      BRAVE_API_KEY:      ${BRAVE_API_KEY:-}
+      # Optional connector creds
+      X_BEARER_TOKEN:     ${X_BEARER_TOKEN:-}
+      YOUTUBE_API_KEY:    ${YOUTUBE_API_KEY:-}
+      RSSHUB_BASE:        ${RSSHUB_BASE:-}
+      RSSHUB_FEEDS:       ${RSSHUB_FEEDS:-}
+      # Cron auth (so /api/cron-tick can be hit from outside)
+      TJ_CRON_TOKEN:      ${TJ_CRON_TOKEN:-}
+    volumes:
+      - trendjack-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # ── Optional: external cron pinger ─────────────────────────────────
+  # The in-process cron in /lib/cron.ts handles this for self-hosts, but
+  # if you scale TrendJack horizontally you want exactly one node poking
+  # /api/cron-tick. Uncomment below + set TJ_CRON_TOKEN to use this.
+  #
+  # cron:
+  #   image: alpine:3.19
+  #   restart: unless-stopped
+  #   environment:
+  #     TJ_CRON_TOKEN: ${TJ_CRON_TOKEN}
+  #   command: >
+  #     sh -c "apk add --no-cache curl &&
+  #     while true; do
+  #       curl -sS -m 60 \"http://app:3000/api/cron-tick?token=$$TJ_CRON_TOKEN\" || true;
+  #       sleep 120;
+  #     done"
+  #   depends_on:
+  #     app:
+  #       condition: service_healthy
+
+  # ── Optional Postgres ──────────────────────────────────────────────
+  # postgres:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: trendjack
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: trendjack
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U trendjack"]
+  #     interval: 10s
+
+volumes:
+  trendjack-data:
+  # postgres-data:
