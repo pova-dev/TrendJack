@@ -73,22 +73,25 @@ export function GeoVisibility() {
   }
 
   return (
-    <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
+    <div className="rounded-md border border-ink-700 bg-ink-900 p-4 relative">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold text-ink-100">AI Visibility (GEO)</h2>
         <div className="flex items-center gap-2">
           <select
             value={windowDays}
             onChange={e => setWindowDays(parseInt(e.target.value, 10))}
-            className="text-2xs h-7 px-2 rounded bg-ink-800 border border-ink-700 text-ink-100"
+            className="text-2xs h-7 px-2 rounded bg-ink-800 border border-ink-700 text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
           >
             <option value={1}>last 24h</option>
             <option value={7}>last 7d</option>
             <option value={30}>last 30d</option>
           </select>
-          <Button size="sm" onClick={runNow} disabled={running}>
-            {running ? '… running' : '✦ Run probe'}
-          </Button>
+          {/* Desktop: top-right CTA. Mobile: hidden here, the sticky bottom-of-card duplicate below picks it up. */}
+          <span className="hidden sm:block">
+            <Button size="sm" onClick={runNow} disabled={running}>
+              {running ? '… running' : '✦ Run probe'}
+            </Button>
+          </span>
         </div>
       </div>
       <p className="text-2xs text-ink-300 mb-3">
@@ -152,7 +155,10 @@ export function GeoVisibility() {
           </div>
 
           <Section title={`Recent samples (${snap.recent.length})`}>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
+            {/* Lift the inner-scroll cap. The 50vh ceiling adapts to the
+                viewport instead of fixed 288px — fewer nested-scroll
+                trap moments per Round-2 Visual Auditor §A.3. */}
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
               {snap.recent.map(r => (
                 <div key={r.id} className="rounded border border-ink-700 bg-ink-800/40 p-2 text-2xs">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -179,6 +185,16 @@ export function GeoVisibility() {
           </p>
         </>
       )}
+
+      {/* Mobile sticky CTA — duplicate of the desktop "Run probe" button
+          that lives in the header. On a phone the panel is taller than
+          the viewport and the only CTA is at the top; this puts it in
+          the thumb arc per Round-2 Visual Auditor §B. */}
+      <div className="sm:hidden sticky bottom-2 mt-3 flex justify-end">
+        <Button size="sm" onClick={runNow} disabled={running} className="shadow-pop">
+          {running ? '… running' : '✦ Run probe'}
+        </Button>
+      </div>
     </div>
   );
 }

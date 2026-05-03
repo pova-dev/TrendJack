@@ -33,7 +33,7 @@ function Field({ label, ...props }: { label: string } & React.InputHTMLAttribute
       <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">{label}</span>
       <input
         {...props}
-        className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500"
+        className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
       />
     </label>
   );

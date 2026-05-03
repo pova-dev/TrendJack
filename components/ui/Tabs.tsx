@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, focusRing } from '@/lib/utils';
 
 interface TabsProps {
   value: string;
@@ -11,13 +11,16 @@ interface TabsProps {
 
 export function Tabs({ value, onChange, tabs, className }: TabsProps) {
   return (
-    <div className={cn('flex border-b border-ink-700', className)}>
+    <div className={cn('flex border-b border-ink-700', className)} role="tablist">
       {tabs.map(t => (
         <button
           key={t.value}
           onClick={() => onChange(t.value)}
+          role="tab"
+          aria-selected={value === t.value}
           className={cn(
-            'px-3 py-2 text-xs font-medium transition-colors relative',
+            'px-3 py-3 sm:py-2 text-xs font-medium motion-safe:transition-colors relative rounded-t-md',
+            focusRing,
             value === t.value
               ? 'text-ink-100'
               : 'text-ink-300 hover:text-ink-100',

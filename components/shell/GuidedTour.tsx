@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import { focusRing } from '@/lib/utils';
 
 // First-time guided tour. Three quick steps pointing at the surfaces a
 // new operator needs to recognize within 30 seconds:
@@ -45,11 +46,26 @@ export function GuidedTour() {
     if (typeof window === 'undefined') return;
     const completed = window.localStorage.getItem(FLAG_KEY);
     if (!completed) {
-      // Slight delay so the dashboard's first paint isn't blocked.
-      const t = setTimeout(() => setStep(0), 600);
-      return () => clearTimeout(t);
+      // Open immediately on first paint (was 600ms — caused operator to
+      // start clicking cards then have a modal hijack focus mid-action,
+      // per Round-2 Visual Auditor finding). The dashboard underneath is
+      // gated via pointer-events-none below so an early click on a card
+      // can't fire while the tour is showing.
+      setStep(0);
     }
   }, []);
+
+  // Block pointer events on the underlying dashboard while the tour is
+  // open. Operators can still scroll (no body lock — that's user-hostile)
+  // but click handlers on cards / buttons / etc. are short-circuited
+  // until the operator dismisses or completes the tour.
+  React.useEffect(() => {
+    if (step === null) return;
+    document.body.style.cursor = 'default';
+    const main = document.querySelector('main');
+    main?.classList.add('pointer-events-none');
+    return () => { main?.classList.remove('pointer-events-none'); };
+  }, [step]);
 
   function dismiss() {
     if (typeof window !== 'undefined') {
@@ -85,7 +101,7 @@ export function GuidedTour() {
           </span>
           <button
             onClick={dismiss}
-            className="ml-auto text-ink-400 hover:text-ink-100 text-lg leading-none"
+            className={`ml-auto text-ink-400 hover:text-ink-100 text-lg leading-none w-8 h-8 sm:w-6 sm:h-6 rounded-md ${focusRing}`}
             aria-label="Dismiss tour"
           >×</button>
         </div>
@@ -109,14 +125,14 @@ export function GuidedTour() {
             {step > 0 && (
               <button
                 onClick={() => setStep(step - 1)}
-                className="h-9 px-3 rounded-md text-xs font-medium text-ink-300 hover:bg-ink-800"
+                className={`h-11 sm:h-9 px-3 rounded-md text-sm sm:text-xs font-medium text-ink-300 hover:bg-ink-800 ${focusRing}`}
               >
                 Back
               </button>
             )}
             <button
               onClick={next}
-              className="h-9 px-4 rounded-md bg-flare-500 text-ink-950 text-sm font-semibold hover:bg-flare-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+              className={`h-11 sm:h-9 px-4 rounded-md bg-flare-500 text-ink-950 text-sm font-semibold hover:bg-flare-400 ${focusRing}`}
             >
               {s.cta}
             </button>

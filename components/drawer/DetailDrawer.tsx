@@ -583,16 +583,20 @@ function BattleTab({ card, loading, err, onGenerate }: {
         </Section>
       )}
 
-      <Section title="Card metadata">
-        <p className="text-2xs text-ink-400">
-          Generated {new Date(card.generatedAt).toLocaleString()}
-          {card.payload.provider && ` · ${card.payload.provider}/${card.payload.model}`}
-          {card.promptVersion && ` · prompt ${card.promptVersion}`}
-        </p>
-        <div className="mt-1.5">
-          <Button size="sm" variant="outline" onClick={onGenerate}>↻ Regenerate</Button>
-        </div>
-      </Section>
+      {/* Regenerate button — promoted into a top-right corner of the card.
+          Card metadata moved into a collapsed details so it doesn't compete
+          with the verdict + angles for visual weight. */}
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={onGenerate}>↻ Regenerate</Button>
+        <details className="text-2xs text-ink-400 ml-auto">
+          <summary className="cursor-pointer hover:text-ink-200 select-none">Metadata</summary>
+          <p className="mt-1">
+            Generated {new Date(card.generatedAt).toLocaleString()}
+            {card.payload.provider && ` · ${card.payload.provider}/${card.payload.model}`}
+            {card.promptVersion && ` · prompt ${card.promptVersion}`}
+          </p>
+        </details>
+      </div>
     </>
   );
 }
@@ -636,15 +640,19 @@ function TrajectoryView({ trend }: { trend: Trend }) {
     else                 peakCopy = `predicted peak ${Math.abs(dtH).toFixed(1)}h ago`;
   }
 
+  // Drop the duplicate phase Chip — the TrendCard already renders the
+  // same pill (`growing 60%`) on its lineage row. The drawer's job is to
+  // EXPAND, not REPEAT. Lead with the peak countdown + advice instead;
+  // the phase name lives in the Section title via parent component.
   return (
     <>
-      <div className="flex items-center gap-2 mb-1.5">
-        <Chip tone={phaseTone} className="uppercase tracking-wider">{phaseLabel}</Chip>
-        <span className="text-2xs font-mono text-ink-300">{Math.round(conf * 100)}% conf</span>
-        <span className="text-2xs text-ink-400">·</span>
-        <span className="text-2xs text-ink-300">{peakCopy}</span>
+      <div className="flex items-baseline gap-2 mb-1.5">
+        <span className={`text-sm font-semibold ${phaseTone === 'good' ? 'text-good-400' : phaseTone === 'flare' ? 'text-flare-400' : phaseTone === 'warn' ? 'text-bad-400' : 'text-ink-100'}`}>
+          {peakCopy}
+        </span>
+        <span className="text-2xs font-mono text-ink-400 ml-auto">{phaseLabel} · {Math.round(conf * 100)}% conf</span>
       </div>
-      <p className="text-2xs text-ink-300/80 italic">{advice}</p>
+      <p className="text-xs text-ink-300/80 italic">{advice}</p>
       {conf < 0.4 && (
         <p className="text-2xs text-ink-400 mt-1">
           Low confidence — based on a small sample. Re-check after the next ingest tick.

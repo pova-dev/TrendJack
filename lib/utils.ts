@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Standard focus ring — visible 2px ring with a 2px gap against ink-900.
+ * Replaces the legacy `focus:ring-1 focus:ring-flare-500` which was
+ * invisible on flare-colored buttons (flare-on-flare). Per the Round-2
+ * Visual Auditor finding: focus rings need to be standardized, not
+ * hand-rolled per component. Apply to every interactive element.
+ */
+export const focusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900';
+
 export function formatBig(n: number | bigint): string {
   const v = typeof n === 'bigint' ? Number(n) : n;
   if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`;

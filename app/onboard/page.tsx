@@ -74,7 +74,7 @@ function Field({ label, ...props }: { label: string } & React.InputHTMLAttribute
   return (
     <label className="block">
       <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">{label}</span>
-      <input {...props} className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500" />
+      <input {...props} className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900" />
     </label>
   );
 }
@@ -82,7 +82,7 @@ function Textarea({ label, ...props }: { label: string } & React.TextareaHTMLAtt
   return (
     <label className="block">
       <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">{label}</span>
-      <textarea {...props} className="mt-1 block w-full px-2.5 py-2 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500" />
+      <textarea {...props} className="mt-1 block w-full px-2.5 py-2 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900" />
     </label>
   );
 }
@@ -90,7 +90,7 @@ function Select({ label, options, ...props }: { label: string; options: string[]
   return (
     <label className="block">
       <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">{label}</span>
-      <select {...props} className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500 capitalize">
+      <select {...props} className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900 capitalize">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </label>

@@ -30,7 +30,7 @@ export function ToneTester({ brand }: Props) {
         onChange={e => setText(e.target.value)}
         placeholder='Type a draft post. e.g. "5000mAh is the new minimum. Anyone shipping less is shipping last year."'
         rows={3}
-        className="block w-full px-2.5 py-2 rounded-md bg-ink-900 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500"
+        className="block w-full px-2.5 py-2 rounded-md bg-ink-900 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
       />
       {text.trim().length > 0 && (
         <div className="mt-3 grid grid-cols-3 gap-2">
