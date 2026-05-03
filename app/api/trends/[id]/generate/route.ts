@@ -34,7 +34,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!auth?.brand || !auth.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { id } = await ctx.params;
-  const body = await req.json().catch(() => ({})) as { replace?: boolean };
+  const body = await req.json().catch(() => ({})) as {
+    replace?: boolean;
+    /** Operator-selected Hook id from the Hook Library. When set, all
+     *  drafts hit this angle. */
+    hookId?: string;
+    /** Operator-selected Template id (channel + structure). */
+    templateId?: string;
+  };
 
   const trend = await getTrend(id);
   if (!trend || trend.brandId !== auth.brand.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -67,6 +74,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const live = await generateDraftsLive({
       trend, brand, research, credentials,
       seed: body.replace ? `regen-${Date.now().toString(36)}` : undefined,
+      hookId: body.hookId,
+      templateId: body.templateId,
     });
     if (live.ok) {
       drafts = live.drafts;

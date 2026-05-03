@@ -160,6 +160,19 @@ Self-check before emitting:
   unprompted, at a bar discussing this trend?
 `.trim();
 
+// Hook descriptions used to guide the AI when the operator picks a
+// specific angle. Mirrors src/agents/creative/hooks.ts but inlined so
+// this server module doesn't import the agents layer.
+const HOOK_DESCRIPTIONS: Record<string, string> = {
+  challenger:      "Brand does the OPPOSITE of the trend, and wins by it. Direct, contrarian framing.",
+  educator:        "Explain the tech / mechanism / story behind the trend. Inform without selling.",
+  comedian:        "Self-aware, anti-marketing wit. Roast the trend gently. Only when cringe is low.",
+  expert_reaction: "Analyst voice — 'here's what we'd actually do, and why'. Skip the 'we' fluff, lead with the take.",
+  told_you_so:     "Trend proves the brand's prior thesis. Reference a specific past stance.",
+  meta_observer:   "Acknowledge the conversation is happening without taking direct sides. Detached, smart.",
+  positional:      "Take a defined stance that contrasts the polarized noise. Not contrarian for its own sake — substantive.",
+};
+
 export async function generateDraftsLive(args: {
   trend: Trend;
   brand: BrandProfile;
@@ -167,8 +180,15 @@ export async function generateDraftsLive(args: {
   credentials?: OrgCredentials;
   /** Bumps the prompt with a seed so a regenerate produces fresh variations. */
   seed?: string;
+  /** Operator-selected Hook id from the Hook Library. When set, the AI
+   *  is instructed to produce drafts that all hit this angle, instead
+   *  of auto-picking variant types. */
+  hookId?: string;
+  /** Operator-selected Template id (channel + structure). When set,
+   *  drafts are constrained to this template's channel + format. */
+  templateId?: string;
 }): Promise<DraftGenResult> {
-  const { trend, brand, research, credentials, seed } = args;
+  const { trend, brand, research, credentials, seed, hookId, templateId } = args;
 
   // Drafts are always high-stakes brand voice — ALWAYS premium tier.
   // Mid-tier models (Llama 70B, Kimi) produce competent but flat copy
@@ -211,7 +231,26 @@ sources:
 ${(research.sources ?? []).slice(0, 4).map((s, i) => `  ${i+1}. ${s.title} — ${s.url}`).join('\n')}
 ` : 'WEB RESEARCH: not yet run for this trend. Reference only what is in TREND. Do NOT invent specifics.'}
 
-GENERATION SEED: ${seed ?? Date.now().toString(36)}
+${hookId && HOOK_DESCRIPTIONS[hookId] ? `OPERATOR HOOK SELECTION
+The operator picked the "${hookId}" hook. EVERY draft you produce must
+hit this specific angle:
+
+  ${HOOK_DESCRIPTIONS[hookId]}
+
+Do not vary the angle across drafts — vary the wording, the platform,
+the length, but the underlying take is locked. Reject "balanced" or
+"educational" framings if the hook is "challenger" / "comedian" /
+"positional", and vice versa.
+` : ''}${templateId ? `OPERATOR TEMPLATE SELECTION
+Constrain output to the "${templateId}" template:
+  ${templateId === 'x-thread-3'        ? 'X (Twitter) thread, exactly 3 posts, ≤220 chars each.' :
+    templateId === 'x-single'          ? 'Single X post, ≤280 chars total.' :
+    templateId === 'ig-carousel-5'     ? 'Instagram carousel, 5 slides, ≤30 words each.' :
+    templateId === 'tiktok-script-30s' ? 'TikTok script, ~30s read time, on-screen text + voice direction.' :
+    templateId === 'linkedin-200w'     ? 'LinkedIn post, ~200 words, professional register.' :
+    'Use your judgment for this template id.'}
+Skip any draft variant that doesn't fit this template.
+` : ''}GENERATION SEED: ${seed ?? Date.now().toString(36)}
 (Use this seed to ensure each regenerate produces fresh angles. Do not echo it back.)
 
 Generate the drafts now. STRICT JSON only.`;

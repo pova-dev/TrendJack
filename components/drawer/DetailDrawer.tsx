@@ -119,14 +119,14 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
 
   const peak = timeUntil(trend.peakWindowEnd);
 
-  async function handleGenerate(replace = false) {
+  async function handleGenerate(replace = false, hookId?: string, templateId?: string) {
     if (!trend) return;
     setGenerating(true);
     try {
       const res = await fetch(`/api/trends/${trend.id}/generate`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ replace }),
+        body: JSON.stringify({ replace, hookId, templateId }),
       });
       const json = await res.json();
       setDraftsResult(json);
@@ -361,53 +361,115 @@ interface DraftsResult {
 function DraftsTab({ result, generating, onGenerate }: {
   result: DraftsResult | null;
   generating: boolean;
-  onGenerate: (replace?: boolean) => void;
+  onGenerate: (replace?: boolean, hookId?: string, templateId?: string) => void;
 }) {
+  // Operator's hook + template selection. null = auto-pick (let AI decide).
+  const [selectedHook, setSelectedHook] = React.useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = React.useState<string | null>(null);
+
   if (!result) {
     return (
       <div className="space-y-4 py-2">
         <div className="text-ink-300 text-xs">
           Drafts compose from a <span className="text-ink-100">Template</span> (channel structure)
           + <span className="text-ink-100">Hook</span> (psychological angle) + <span className="text-ink-100">Context</span> (verified
-          claims + brand voice). The AI picks the best combo for this trend; the picker below shows
-          what's available.
+          claims + brand voice). Click a Hook or Template to lock the angle, or let the AI auto-pick.
         </div>
 
         <div>
-          <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300 mb-2">Hook Library</h4>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300">Hook Library</h4>
+            {selectedHook && (
+              <button
+                onClick={() => setSelectedHook(null)}
+                className="text-2xs text-ink-400 hover:text-ink-100 underline"
+              >
+                clear · auto-pick
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {HOOK_LIBRARY_DISPLAY.map(h => (
-              <div key={h.id} className="rounded-md border border-ink-700 bg-ink-800/40 p-2">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-xs font-semibold text-ink-100">{h.label}</span>
-                  <Chip tone={h.risk === 'spicy' ? 'bad' : h.risk === 'edgy' ? 'warn' : 'good'}>
-                    {h.risk}
-                  </Chip>
-                </div>
-                <p className="text-2xs text-ink-300 mt-0.5 leading-snug">{h.angle}</p>
-              </div>
-            ))}
+            {HOOK_LIBRARY_DISPLAY.map(h => {
+              const active = selectedHook === h.id;
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => setSelectedHook(active ? null : h.id)}
+                  className={cn(
+                    'text-left rounded-md border p-2 transition-colors',
+                    active
+                      ? 'border-flare-500 bg-flare-500/10'
+                      : 'border-ink-700 bg-ink-800/40 hover:border-ink-600 hover:bg-ink-800/60',
+                  )}
+                  title={`Click to ${active ? 'unlock' : 'lock'} this hook for the next generation`}
+                >
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={cn('text-xs font-semibold', active ? 'text-flare-400' : 'text-ink-100')}>{h.label}</span>
+                    <Chip tone={h.risk === 'spicy' ? 'bad' : h.risk === 'edgy' ? 'warn' : 'good'}>
+                      {h.risk}
+                    </Chip>
+                    {active && <span className="ml-auto text-flare-400 text-2xs">✓</span>}
+                  </div>
+                  <p className="text-2xs text-ink-300 mt-0.5 leading-snug">{h.angle}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div>
-          <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300 mb-2">Templates</h4>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300">Templates</h4>
+            {selectedTemplate && (
+              <button
+                onClick={() => setSelectedTemplate(null)}
+                className="text-2xs text-ink-400 hover:text-ink-100 underline"
+              >
+                clear
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-1.5">
-            {TEMPLATE_DISPLAY.map(t => (
-              <Chip key={t.id} tone="info" title={t.label}>
-                {t.label}
-              </Chip>
-            ))}
+            {TEMPLATE_DISPLAY.map(t => {
+              const active = selectedTemplate === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSelectedTemplate(active ? null : t.id)}
+                  className={cn(
+                    'text-2xs px-2 py-1 rounded-md border transition-colors',
+                    active
+                      ? 'border-flare-500 bg-flare-500/10 text-flare-400'
+                      : 'border-ink-700 bg-ink-800/40 text-ink-200 hover:border-ink-600',
+                  )}
+                  title={t.label}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="pt-2 border-t border-ink-700">
-          <Button variant="primary" onClick={() => onGenerate(false)} disabled={generating} className="w-full">
-            {generating ? 'Generating…' : '✦ Generate drafts'}
+          <Button
+            variant="primary"
+            onClick={() => onGenerate(false, selectedHook ?? undefined, selectedTemplate ?? undefined)}
+            disabled={generating}
+            className="w-full"
+          >
+            {generating
+              ? 'Generating…'
+              : selectedHook || selectedTemplate
+                ? `✦ Generate ${[selectedHook, selectedTemplate].filter(Boolean).join(' · ')}`
+                : '✦ Generate drafts (auto-pick)'}
           </Button>
           <p className="text-2xs text-ink-400 mt-1.5 text-center">
-            AI picks 1–3 (template, hook) variants based on this trend's recommendation
-            and your brand's voice fit.
+            {selectedHook || selectedTemplate
+              ? 'All drafts will hit the locked selection above.'
+              : 'AI picks 1–3 (template, hook) variants based on the trend & your brand voice.'}
           </p>
         </div>
       </div>
