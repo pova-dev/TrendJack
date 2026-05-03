@@ -25,9 +25,13 @@ import { startVerifierAgent, stubVerifier, makeLlmVerifier } from '@/src/agents/
 import { aiHealth } from '@/lib/ai/provider';
 import { startArchitectAgent } from '@/src/agents/architect';
 import { bootstrapConnectors } from '@/src/connectors';
-import { getBrand, persistScoredTrend } from './store';
+import { getBrand, persistScoredTrend, getTrend } from './store';
 import { enrichSignal } from './enrichment';
 import { startPushDeliveryWorker } from './push-delivery';
+import { startBattleCardAgent } from '@/src/agents/battlecard';
+import { getOrgCredentials } from './credentials';
+import { prisma } from './db';
+import type { RawSignal, ScoreResult } from '@/src/core/scoring/types';
 
 interface AgentRunState {
   startedAt: Date;
@@ -74,13 +78,110 @@ export function bootAgents(): AgentRunState {
   startArchitectAgent({
     bus,
     onStuck: () => { stuckMessages++; },
-    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery'],
+    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent'],
   });
 
   // Push-delivery worker — subscribes to STREAMS.alerts and fans out
   // Web Push notifications to PushSubscription rows for the alerted
   // brand. Idle when PUSH_VAPID_* env vars are missing.
   startPushDeliveryWorker();
+
+  // Battle-Card agent — subscribes to STREAMS.lineage. The lineage-cron
+  // emits dilutive / competitor-claimed reports each tick; agent
+  // generates strategy cards via premium AI (with saturation>0.6
+  // short-circuit + 6h debounce). Always boots — runChat() falls back
+  // to per-org credentials threaded through loadTrendContext, so an
+  // org with API keys configured via the UI works even without
+  // env-level keys at boot time.
+  {
+    startBattleCardAgent({
+      bus,
+      loadBrand: async (brandId) => getBrand(brandId),
+      loadTrendContext: async (trendId) => {
+        const t = await getTrend(trendId);
+        if (!t) return { currentCardGeneratedAt: null, signal: null, scoreResult: null, orgId: null, credentials: {} };
+        const brandRow = await prisma.brand.findUnique({ where: { id: t.brandId }, select: { orgId: true } });
+        const card = await prisma.battleCard.findFirst({
+          where: { trendId, supersededAt: null },
+          orderBy: { generatedAt: 'desc' },
+          select: { generatedAt: true },
+        });
+        const credentials = brandRow?.orgId ? await getOrgCredentials(brandRow.orgId) : {};
+        const signal: RawSignal = {
+          source: t.source,
+          title: t.title,
+          summary: t.summary,
+          hashtags: t.hashtags,
+          lineage: t.lineage,
+          catalyst: t.catalyst,
+          firstSeenAt: new Date(t.firstSeenAt),
+          velocity: t.velocity,
+          reach: Number(t.reach),
+          sentiment: t.sentiment,
+          competitorClaimants: t.competitorClaimants,
+          formatFatigue: t.formatFatigue ?? 0,
+          examples: t.examples,
+          url: t.url,
+          externalId: t.sourceRef,
+        };
+        const scoreResult: ScoreResult = {
+          scores: t.scores,
+          rationale: t.rationale,
+          recommendation: t.recommendation,
+          recommendationReason: t.recommendationReason,
+          peakWindowEnd: t.peakWindowEnd ? new Date(t.peakWindowEnd) : new Date(),
+          jackingScore: t.scores.jackingScore ?? 0,
+          brandKeywordHit: t.brandKeywordHit ?? false,
+          matchedBrandKeywords: t.matchedBrandKeywords ?? [],
+        };
+        return {
+          currentCardGeneratedAt: card?.generatedAt.getTime() ?? null,
+          signal,
+          scoreResult,
+          orgId: brandRow?.orgId ?? null,
+          credentials,
+        };
+      },
+      persistCard: async ({ trendId, brandId, orgId, card, promptVersion, costUsd }) => {
+        await prisma.battleCard.updateMany({
+          where: { trendId, supersededAt: null },
+          data: { supersededAt: new Date() },
+        });
+        await prisma.battleCard.create({
+          data: {
+            trendId, brandId, orgId,
+            verdict: card.verdict,
+            verdictReason: card.verdictReason,
+            payload: JSON.stringify(card),
+            cost: costUsd,
+            promptVersion,
+          },
+        });
+      },
+      persistShortCircuitCard: async ({ trendId, brandId, orgId, verdict, verdictReason, saturationScore, competitorClaimants }) => {
+        const card = {
+          trendId, brandId, verdict, verdictReason,
+          saturationScore, competitorClaimants,
+          angleOptions: [], counterClaim: null, doNotDo: [],
+          generatedAt: new Date(),
+          provider: 'system', model: 'short-circuit',
+        };
+        await prisma.battleCard.updateMany({
+          where: { trendId, supersededAt: null },
+          data: { supersededAt: new Date() },
+        });
+        await prisma.battleCard.create({
+          data: {
+            trendId, brandId, orgId,
+            verdict, verdictReason,
+            payload: JSON.stringify(card),
+            cost: 0,
+            promptVersion: 'short-circuit',
+          },
+        });
+      },
+    });
+  }
 
   const state: AgentRunState = {
     startedAt: new Date(),

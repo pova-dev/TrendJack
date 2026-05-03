@@ -3,6 +3,7 @@ import { requireBrand } from '@/lib/auth';
 import { getBrand, listBrandsForOrg } from '@/lib/store';
 import { TopBar } from '@/components/shell/TopBar';
 import { BrandEditor } from '@/components/brand/BrandEditor';
+import { GeoVisibility } from '@/components/brand/GeoVisibility';
 
 export default async function BrandPage() {
   const ctx = await requireBrand();
@@ -24,6 +25,9 @@ export default async function BrandPage() {
           <p className="text-sm text-ink-300">Edit anything. Autosaves. Other teammates see your changes live.</p>
         </header>
         <BrandEditor initial={brand} />
+        <div className="mt-5">
+          <GeoVisibility />
+        </div>
       </div>
     </>
   );
