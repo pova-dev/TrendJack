@@ -127,7 +127,57 @@ export async function listTrends(brandId: string, opts: ListTrendOpts = {}): Pro
     seen.add(r.id);
     merged.push(r);
   }
-  const rows = merged;
+
+  // ──────────────────────────────────────────────────────────────────────
+  // UI-level dedup. Even after Phase-3's ingest-time dedup, the DB still
+  // contains historical duplicates from before the fix landed (e.g. four
+  // separate Reddit cross-posts of "POVA Curve 2 Battery Life is Insane"
+  // each with its own Reddit post-id). We collapse them at read time so
+  // the dashboard shows one canonical card per unique title-on-source.
+  // The non-canonical rows stay in the DB — they continue to accumulate
+  // sample data — they just don't render twice.
+  //
+  // Canonical = highest velocity (most engagement). Pinned wins
+  // unconditionally so a user's pin is never collapsed away by a more
+  // active duplicate.
+  // ──────────────────────────────────────────────────────────────────────
+  const fpKey = (r: { title: string; source: string; url: string | null }): string => {
+    // Always use source+fingerprint. URL-based keys break for Reddit
+    // cross-posts (4 different post-IDs → 4 different URLs → no merge),
+    // which is exactly the scenario producing 4× POVA Curve cards on
+    // the live dashboard.
+    //
+    // Cross-source dedup (same article on News + HN) still works because
+    // both connectors normalize to the same title; the source prefix
+    // means they don't collide ('reddit:foo' vs 'news:foo'), but that's
+    // the correct call — they're legitimately different signals (Reddit
+    // discussion ≠ news article) even if the underlying topic matches.
+    const stripped = r.title
+      .replace(/\s*[-–—]\s*([A-Z][A-Za-z0-9.]*(?:\s+[A-Z][A-Za-z0-9.]*){0,3})\s*$/, '')
+      .toLowerCase()
+      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 120);
+    return `${r.source}:${stripped}`;
+  };
+
+  const byFp = new Map<string, typeof priorityRows[number]>();
+  for (const r of merged) {
+    const key = fpKey(r);
+    const existing = byFp.get(key);
+    if (!existing) {
+      byFp.set(key, r);
+      continue;
+    }
+    // Pinned beats everything; otherwise highest-velocity wins.
+    const winner =
+      r.pinned && !existing.pinned ? r
+      : existing.pinned && !r.pinned ? existing
+      : r.velocity > existing.velocity ? r
+      : existing;
+    byFp.set(key, winner);
+  }
+  const rows = Array.from(byFp.values());
 
   // Apply filters not directly mapped to columns (we stored scores as JSON).
   let items = rows.map(rowToTrend);

@@ -1,12 +1,72 @@
-import type { ColumnConfig, Trend } from '@/types';
+import type { ColumnConfig, Trend, ColumnType } from '@/types';
 
-// Apply a column's filter+sort against a flat trend list. Used both server-side
-// (when seeding the page) and client-side (when refreshing in-place).
-export function applyColumnFilter(col: ColumnConfig, trends: Trend[]): Trend[] {
+// ──────────────────────────────────────────────────────────────────────
+// Cross-column priority. A trend whose filters match multiple columns
+// is shown in EXACTLY ONE — the highest-priority match. Lower number =
+// higher priority (claims first).
+// ──────────────────────────────────────────────────────────────────────
+const COLUMN_PRIORITY: Record<ColumnType, number> = {
+  alerts:                100,
+  compliance_hold:       110,
+  crisis_watch:          120,
+  brand_matches:         200,   // brand-keyword hits → here, not elsewhere
+  competitor_activity:   300,
+  first_mover_window:    400,
+  risk_watch:            500,
+  decay_watch:           550,
+  approved_opportunities:600,
+  draft_ideas:           650,
+  creator_signals:       700,
+  emerging_memes:        750,
+  high_velocity:         800,
+  rising_trends:         900,   // broad catch-all, claims last
+  localization_queue:    950,
+  custom:                999,
+};
+
+/** Sort columns by priority (specific → broad), break ties via render order. */
+export function priorityOrderedColumns<T extends { id: string; type: ColumnType }>(cols: T[]): T[] {
+  return cols
+    .map((c, idx) => ({ c, idx, p: COLUMN_PRIORITY[c.type] ?? 999 }))
+    .sort((a, b) => a.p - b.p || a.idx - b.idx)
+    .map(x => x.c);
+}
+
+/**
+ * Compute exclusive trend-to-column assignment. Each trend lands in its
+ * highest-priority matching column.
+ */
+export function assignTrendsToColumns(
+  cols: ColumnConfig[],
+  trends: Trend[],
+): Map<string, Trend[]> {
+  const claimed = new Set<string>();
+  const result = new Map<string, Trend[]>();
+  for (const col of priorityOrderedColumns(cols)) {
+    const matches = applyColumnFilter(col, trends, claimed);
+    result.set(col.id, matches);
+    for (const t of matches) claimed.add(t.id);
+  }
+  return result;
+}
+
+// Apply a column's filter+sort against a flat trend list. Used both
+// server-side (when seeding the page) and client-side (when refreshing).
+//
+// `claimedIds` (optional): trends already assigned to a higher-priority
+// column. When provided, this column won't show them. Pinned Watchlist
+// (filters.pinnedOnly) opts out — pinned trends always show in their
+// dedicated lane regardless.
+export function applyColumnFilter(
+  col: ColumnConfig,
+  trends: Trend[],
+  claimedIds?: Set<string>,
+): Trend[] {
   const f = col.filters;
   const now = Date.now();
 
   let items = trends.filter(t => {
+    if (claimedIds?.has(t.id) && !f.pinnedOnly) return false;
     if (f.sources?.length && !f.sources.includes(t.source)) return false;
     if (f.recommendations?.length && !f.recommendations.includes(t.recommendation)) return false;
     if (typeof f.minOpportunity === 'number' && t.scores.opportunity < f.minOpportunity) return false;
