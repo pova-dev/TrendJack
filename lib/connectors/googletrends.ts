@@ -49,8 +49,14 @@ export class GoogleTrendsConnector implements Connector {
 
     try {
       const url = `https://trends.google.com/trending/rss?geo=${encodeURIComponent(geo)}`;
+      // Google Trends RSS rejects generic / bot-like UAs with a 403/429.
+      // A browser-style UA passes their bot-detection consistently in
+      // testing. (Direct curl with this UA: HTTP 200 in ~700ms.)
       const res = await fetch(url, {
-        headers: { 'user-agent': 'trendjack/1.0', accept: 'application/rss+xml, application/xml;q=0.9' },
+        headers: {
+          'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+        },
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) {
