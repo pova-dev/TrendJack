@@ -24,9 +24,23 @@ const COLUMN_PRIORITY: Record<ColumnType, number> = {
   custom:                999,
 };
 
-/** Sort columns by priority (specific → broad), break ties via render order. */
+/** Observer columns — these TAP the trend stream (show their filtered view)
+ *  but do NOT claim trends. They're warning / oversight lanes; a trend
+ *  appearing in Risk Watch should still appear in its primary lane.
+ *
+ *  Without this distinction, an Alerts column with empty filters (`{}`)
+ *  would claim ALL trends at priority 100 and leave every other column
+ *  empty.
+ */
+const OBSERVER_TYPES = new Set<ColumnType>([
+  'alerts', 'risk_watch', 'decay_watch', 'compliance_hold', 'crisis_watch',
+]);
+
+/** Sort columns by priority (specific → broad), break ties via render order.
+ *  Observer columns are excluded — they don't participate in the claim phase. */
 export function priorityOrderedColumns<T extends { id: string; type: ColumnType }>(cols: T[]): T[] {
   return cols
+    .filter(c => !OBSERVER_TYPES.has(c.type))
     .map((c, idx) => ({ c, idx, p: COLUMN_PRIORITY[c.type] ?? 999 }))
     .sort((a, b) => a.p - b.p || a.idx - b.idx)
     .map(x => x.c);
@@ -34,7 +48,9 @@ export function priorityOrderedColumns<T extends { id: string; type: ColumnType 
 
 /**
  * Compute exclusive trend-to-column assignment. Each trend lands in its
- * highest-priority matching column.
+ * highest-priority matching CLAIMING column. Observer columns
+ * (Alerts / Risk Watch / Decay Watch / Compliance / Crisis) get the
+ * full unclaimed view via legacy applyColumnFilter without claimedIds.
  */
 export function assignTrendsToColumns(
   cols: ColumnConfig[],
@@ -42,11 +58,21 @@ export function assignTrendsToColumns(
 ): Map<string, Trend[]> {
   const claimed = new Set<string>();
   const result = new Map<string, Trend[]>();
+
+  // Phase 1: claim phase — only non-observer columns participate.
   for (const col of priorityOrderedColumns(cols)) {
     const matches = applyColumnFilter(col, trends, claimed);
     result.set(col.id, matches);
     for (const t of matches) claimed.add(t.id);
   }
+
+  // Phase 2: observer columns — full filtered view of ALL trends,
+  // independent of what other columns claimed.
+  for (const col of cols) {
+    if (!OBSERVER_TYPES.has(col.type)) continue;
+    result.set(col.id, applyColumnFilter(col, trends));
+  }
+
   return result;
 }
 

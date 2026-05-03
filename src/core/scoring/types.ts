@@ -53,6 +53,12 @@ export interface ScoringContext {
   weights?: ScoringWeights;
   /** how many times brand has already posted on this thread */
   brandPostCountForTrend?: number;
+  /** Optional Phase-4 cascade inputs for CVS upgrade. Filter Agent
+   *  computes these per-trend before invoking score(). When omitted,
+   *  CVS reduces to the simpler S_max formula (still correct). */
+  reproductionRate?: number;
+  crossSourceCount?: number;
+  hoursSinceCompetitorClaim?: number;
 }
 
 /**
