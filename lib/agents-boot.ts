@@ -25,6 +25,7 @@ import { startVerifierAgent, stubVerifier } from '@/src/agents/verifier';
 import { startArchitectAgent } from '@/src/agents/architect';
 import { bootstrapConnectors } from '@/src/connectors';
 import { getBrand } from './store';
+import { enrichSignal } from './enrichment';
 
 interface AgentRunState {
   startedAt: Date;
@@ -50,6 +51,7 @@ export function bootAgents(): AgentRunState {
   startFilterAgent({
     bus,
     loadBrand: async (brandId) => getBrand(brandId),
+    enrichSignal: async (signal, brandId) => enrichSignal(signal, brandId),
   });
 
   startVerifierAgent({
