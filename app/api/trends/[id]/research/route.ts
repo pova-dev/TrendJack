@@ -51,7 +51,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const [research, verification] = await Promise.all([
     researchTrend(trend, credsWithHint),
     aiReady
-      ? makeLlmVerifier({ credentials: creds }).verify({ signal: trendAsSignal, brandId: auth.brand.id })
+      ? makeLlmVerifier({ credentials: creds }).verify({ signal: trendAsSignal, brandId: auth.brand.id, orgId: auth.org?.id })
       : Promise.resolve(null),
   ]);
 

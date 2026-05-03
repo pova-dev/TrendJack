@@ -187,8 +187,11 @@ export async function generateDraftsLive(args: {
   /** Operator-selected Template id (channel + structure). When set,
    *  drafts are constrained to this template's channel + format. */
   templateId?: string;
+  /** Org id for daily AI budget enforcement. Drafts are ALWAYS premium
+   *  tier ($3/$15 per M tokens) so a single chatty draft can be 1-2¢. */
+  orgId?: string;
 }): Promise<DraftGenResult> {
-  const { trend, brand, research, credentials, seed, hookId, templateId } = args;
+  const { trend, brand, research, credentials, seed, hookId, templateId, orgId } = args;
 
   // Drafts are always high-stakes brand voice — ALWAYS premium tier.
   // Mid-tier models (Llama 70B, Kimi) produce competent but flat copy
@@ -266,6 +269,7 @@ Generate the drafts now. STRICT JSON only.`;
     temperature: 0.85,
     jsonMode: true,
     credentials,
+    orgId,
   });
 
   if (!ai.ok) return { ok: false, error: ai.error, provider: ai.provider };

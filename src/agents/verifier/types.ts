@@ -57,6 +57,10 @@ export interface VerifierAdapter {
   verify(input: {
     signal: RawSignal;
     brandId: string;
+    /** Org id forwarded to the AI provider for daily budget enforcement.
+     *  Optional — adapters that don't make budget-aware calls (the stub)
+     *  ignore it. */
+    orgId?: string;
     keysToExtract?: string[];
   }): Promise<{
     summary: string;

@@ -51,6 +51,7 @@ export function startVerifierAgent(deps: VerifierAgentDeps): VerifierAgentHandle
         const out = await deps.adapter.verify({
           signal: body.signal,
           brandId: body.brandId,
+          orgId: body.orgId,
         });
 
         // Demote any claim below confidence floor — model wasn't sure

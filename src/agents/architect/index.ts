@@ -1,14 +1,20 @@
 // Architect Agent.
 //
 // The orchestrator. Watches the bus's `pending()` for stuck messages,
-// enforces per-org budget caps on AI calls, retries with backoff, and
-// publishes DLQ entries for unrecoverable failures.
+// surfaces per-org budget telemetry from lib/ai/budget, and (TODO) will
+// publish DLQ entries for unrecoverable failures.
 //
 // Design: Architect runs as a singleton process (one per Node instance).
 // It owns no agent-specific logic — it's the meta-layer that keeps the
 // other agents healthy.
+//
+// Budget enforcement is NOT done here — it's done at the call site by
+// runChat() in lib/ai/provider.ts, which checks isOverBudget(orgId)
+// before dispatching and recordCost(orgId, usd) after a successful call.
+// This agent just exposes the live snapshot for telemetry.
 
 import type { StateBus, PendingInfo } from '@/src/core/state';
+import { budgetSnapshot as readBudgetSnapshot } from '@/lib/ai/budget';
 
 export interface ArchitectDeps {
   bus: StateBus;
@@ -70,9 +76,16 @@ export function startArchitectAgent(deps: ArchitectDeps): ArchitectHandle {
     },
     scanNow,
     budgetSnapshot: () => {
-      const out: Record<string, { spentUsd: number; capUsd: number }> = {};
+      // Live snapshot from the provider-level tracker (lib/ai/budget).
+      // The local `caps` / `spent` maps are kept for backwards compat with
+      // tests that injected explicit caps, but the canonical store is the
+      // singleton tracker that runChat() reads + writes per call.
+      const live = readBudgetSnapshot();
+      const out: Record<string, { spentUsd: number; capUsd: number }> = { ...live };
       for (const orgId of new Set([...Object.keys(spent), ...Object.keys(caps)])) {
-        out[orgId] = { spentUsd: spent[orgId] ?? 0, capUsd: caps[orgId] ?? Infinity };
+        if (!out[orgId]) {
+          out[orgId] = { spentUsd: spent[orgId] ?? 0, capUsd: caps[orgId] ?? Infinity };
+        }
       }
       return out;
     },

@@ -47,71 +47,98 @@ export class GoogleTrendsConnector implements Connector {
     const emitAll = opts.emitAll ?? true;
     const signals: RawSignal[] = [];
 
-    try {
-      const url = `https://trends.google.com/trending/rss?geo=${encodeURIComponent(geo)}`;
-      // Google Trends RSS rejects generic / bot-like UAs with a 403/429.
-      // A browser-style UA passes their bot-detection consistently in
-      // testing. (Direct curl with this UA: HTTP 200 in ~700ms.)
-      const res = await fetch(url, {
-        headers: {
-          'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-          accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-        },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) {
-        return { ok: false, source: 'google_trends', mode: 'live', reason: `gtrends_rss_${res.status}` };
-      }
-      const xml = await res.text();
-      const json = parser.parse(xml);
-      const channel = json?.rss?.channel;
-      const items = (Array.isArray(channel?.item) ? channel.item : channel?.item ? [channel.item] : []) as RssItem[];
+    // Categories to poll. When the brand has selected categories (via
+    // /brand settings), we fan out one fetch per category and tag the
+    // emitted signals so column-level filters can narrow further.
+    // Default '' = top stories (all categories), preserving prior behavior
+    // for brands that haven't picked.
+    const categoryIds = (opts.gtrendsCategories && opts.gtrendsCategories.length > 0)
+      ? opts.gtrendsCategories
+      : [''];
 
-      for (const it of items.slice(0, 20)) {
-        const pub = new Date(it.pubDate);
-        if (Number.isNaN(pub.getTime())) continue;
-        const title = it.title;
-        const blob = title.toLowerCase();
-        const matchKw = keywords.length === 0 || keywords.some(k => blob.includes(k));
-
-        const competitorClaimants = [...competitorSet].filter(c => blob.includes(c));
-        const news = Array.isArray(it['ht:news_item']) ? it['ht:news_item'] : it['ht:news_item'] ? [it['ht:news_item']] : [];
-        const article = news[0];
-        const traffic = parseTraffic(it['ht:approx_traffic']);
-
-        // Quality filters — Google Trends RSS dumps a lot of noise:
-        // single-word non-Latin queries with no news context are useless
-        // for brand-fit scoring. Skip them unless the keyword filter
-        // explicitly hit. Also require a news article OR a brand-keyword
-        // hit OR a competitor mention so we never persist context-free
-        // garbage like "मु" or "sinner".
-        const hasNewsArticle = !!(article?.['ht:news_item_url']);
-        const isShort = title.trim().length < 4;
-        const isSingleNonLatinWord = !/\s/.test(title.trim()) && !/[a-z0-9]/i.test(title);
-        const passesQuality = (matchKw || competitorClaimants.length > 0 || hasNewsArticle)
-          && !isShort
-          && !isSingleNonLatinWord;
-        if (!passesQuality && !matchKw) continue;
-        if (!matchKw && !emitAll && !hasNewsArticle) continue;
-
-        signals.push({
-          source: 'google_trends',
-          title: title.slice(0, 200),
-          summary: ((article?.['ht:news_item_title'] ?? '') as string).slice(0, 240) || `Trending in ${geo}.`,
-          hashtags: ['#GoogleTrends'],
-          lineage: `Google Trends · ${geo}${article?.['ht:news_item_source'] ? ` · top src: ${article['ht:news_item_source']}` : ''} · ${it['ht:approx_traffic'] ?? '—'}`,
-          firstSeenAt: pub,
-          velocity: Math.max(10, traffic / 1000),
-          reach: traffic,
-          sentiment: 0,
-          competitorClaimants,
-          formatFatigue: 0,
-          url: (article?.['ht:news_item_url'] as string) ?? `https://trends.google.com/trends/explore?q=${encodeURIComponent(title)}&geo=${geo}`,
-          externalId: `gtrends:${geo}:${hash(title + pub.toISOString())}`,
+    for (const catId of categoryIds) {
+      try {
+        // 'top' is our internal alias for "all categories" — it maps to
+        // an empty &category= URL param, which is Google's default.
+        const urlCat = catId === 'top' ? '' : catId;
+        const url = `https://trends.google.com/trending/rss?geo=${encodeURIComponent(geo)}${urlCat ? `&category=${encodeURIComponent(urlCat)}` : ''}`;
+        // Google Trends RSS rejects generic / bot-like UAs with a 403/429.
+        // A browser-style UA passes their bot-detection consistently in
+        // testing. (Direct curl with this UA: HTTP 200 in ~700ms.)
+        const res = await fetch(url, {
+          headers: {
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+            accept: 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+          },
+          signal: AbortSignal.timeout(10_000),
         });
+        if (!res.ok) {
+          // One category 4xx shouldn't kill the whole connector — log and
+          // continue. The legacy single-fetch path returned an error here;
+          // with fan-out we prefer partial success.
+          if (categoryIds.length === 1) {
+            return { ok: false, source: 'google_trends', mode: 'live', reason: `gtrends_rss_${res.status}` };
+          }
+          continue;
+        }
+        const xml = await res.text();
+        const json = parser.parse(xml);
+        const channel = json?.rss?.channel;
+        const items = (Array.isArray(channel?.item) ? channel.item : channel?.item ? [channel.item] : []) as RssItem[];
+
+        for (const it of items.slice(0, 20)) {
+          const pub = new Date(it.pubDate);
+          if (Number.isNaN(pub.getTime())) continue;
+          const title = it.title;
+          const blob = title.toLowerCase();
+          const matchKw = keywords.length === 0 || keywords.some(k => blob.includes(k));
+
+          const competitorClaimants = [...competitorSet].filter(c => blob.includes(c));
+          const news = Array.isArray(it['ht:news_item']) ? it['ht:news_item'] : it['ht:news_item'] ? [it['ht:news_item']] : [];
+          const article = news[0];
+          const traffic = parseTraffic(it['ht:approx_traffic']);
+
+          // Quality filters — same logic as before. Single-fetch noise
+          // (short / non-Latin / no news context) gets dropped.
+          const hasNewsArticle = !!(article?.['ht:news_item_url']);
+          const isShort = title.trim().length < 4;
+          const isSingleNonLatinWord = !/\s/.test(title.trim()) && !/[a-z0-9]/i.test(title);
+          const passesQuality = (matchKw || competitorClaimants.length > 0 || hasNewsArticle)
+            && !isShort
+            && !isSingleNonLatinWord;
+          if (!passesQuality && !matchKw) continue;
+          if (!matchKw && !emitAll && !hasNewsArticle) continue;
+
+          // Tag lineage with the category so downstream column filters
+          // can narrow on it. The empty / 'all' category gets tagged
+          // 'top' for consistent UX. Format: `[cat:<id>]` token at the
+          // start of lineage — easy to substring-match without fancy
+          // schema changes.
+          const catTag = catId ? catId : 'top';
+
+          signals.push({
+            source: 'google_trends',
+            title: title.slice(0, 200),
+            summary: ((article?.['ht:news_item_title'] ?? '') as string).slice(0, 240) || `Trending in ${geo}.`,
+            hashtags: ['#GoogleTrends'],
+            lineage: `[cat:${catTag}] Google Trends · ${geo}${article?.['ht:news_item_source'] ? ` · top src: ${article['ht:news_item_source']}` : ''} · ${it['ht:approx_traffic'] ?? '—'}`,
+            firstSeenAt: pub,
+            velocity: Math.max(10, traffic / 1000),
+            reach: traffic,
+            sentiment: 0,
+            competitorClaimants,
+            formatFatigue: 0,
+            url: (article?.['ht:news_item_url'] as string) ?? `https://trends.google.com/trends/explore?q=${encodeURIComponent(title)}&geo=${geo}`,
+            externalId: `gtrends:${geo}:${catTag}:${hash(title + pub.toISOString())}`,
+          });
+        }
+      } catch (e) {
+        // Single-category failure is ignored when we have multiple. Only
+        // bail out completely if there's just one in the fan-out.
+        if (categoryIds.length === 1) {
+          return { ok: false, source: 'google_trends', mode: 'live', reason: `gtrends_${(e as Error).message}` };
+        }
       }
-    } catch (e) {
-      return { ok: false, source: 'google_trends', mode: 'live', reason: `gtrends_${(e as Error).message}` };
     }
 
     return { ok: true, source: 'google_trends', mode: 'live', signals, fetchedAt: new Date() };

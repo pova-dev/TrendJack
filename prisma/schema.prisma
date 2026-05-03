@@ -83,6 +83,15 @@ model Brand {
   /// keywords are what land a trend in the "Brand Matches" column.
   /// e.g. for POVA: ["pova","tecno pova","pova curve","pova 7","tecno"]
   brandKeywords     String        @default("[]")
+  /// JSON array of Google Trends category ids to ingest for this brand.
+  /// The Google Trends connector fans out one fetch per category and tags
+  /// each signal in the lineage. Empty array = "top stories" (all
+  /// categories), the legacy default.
+  ///   ''/'all' → top stories     'b' → business
+  ///   't' → sports               'e' → entertainment
+  ///   'm' → sci/tech             'h' → health
+  /// Auto-suggested at brand creation from `category` text.
+  gtrendsCategories String        @default("[]")
   safeThemes        String        @default("[]")
   competitors       String        @default("[]")
   priorityPlatforms String        @default("[]")

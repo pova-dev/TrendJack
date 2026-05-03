@@ -76,6 +76,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       seed: body.replace ? `regen-${Date.now().toString(36)}` : undefined,
       hookId: body.hookId,
       templateId: body.templateId,
+      orgId: auth.org?.id,
     });
     if (live.ok) {
       drafts = live.drafts;

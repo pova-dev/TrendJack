@@ -53,6 +53,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
   const [newsAllow, setNewsAllow] = React.useState<string[]>(initial?.filters.newsAllow ?? []);
   const [newsDeny, setNewsDeny] = React.useState<string[]>(initial?.filters.newsDeny ?? []);
   const [refreshSec, setRefreshSec] = React.useState<number>(initial?.refreshSec ?? 60);
+  const [gtrendsCategory, setGtrendsCategory] = React.useState<string>(initial?.filters.gtrendsCategory ?? '');
   const [sortKey, setSortKey] = React.useState<string>((initial?.sort.key as string) ?? 'opportunity');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>(initial?.sort.dir ?? 'desc');
 
@@ -83,6 +84,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
         twitterLocale: sources.includes('x') ? twitterLocale : undefined,
         newsAllow: newsAllow.length ? newsAllow : undefined,
         newsDeny: newsDeny.length ? newsDeny : undefined,
+        gtrendsCategory: sources.includes('google_trends') && gtrendsCategory ? gtrendsCategory : undefined,
       },
       sort: { key: sortKey as ColumnConfig['sort']['key'], dir: sortDir },
     });
@@ -158,6 +160,25 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
               </div>
             </div>
           </Section>
+
+          {sources.includes('google_trends') ? (
+            <Section title="Google Trends options">
+              <Picker label="Category" value={gtrendsCategory} onChange={setGtrendsCategory}
+                options={[
+                  ['',     'All (any category)'],
+                  ['top',  'Top stories'],
+                  ['t',    'Sports'],
+                  ['b',    'Business'],
+                  ['e',    'Entertainment'],
+                  ['m',    'Sci & Tech'],
+                  ['h',    'Health'],
+                ]} />
+              <p className="text-2xs text-ink-400 mt-2">
+                Brand profile decides which categories are <em>ingested</em>. This dropdown
+                narrows the column to one of those — pick &quot;All&quot; to show every ingested category.
+              </p>
+            </Section>
+          ) : null}
 
           {sources.length === 0 || sources.includes('x') ? (
             <Section title="Twitter / X options">

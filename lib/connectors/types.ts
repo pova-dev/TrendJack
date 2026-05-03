@@ -32,6 +32,22 @@ export interface ConnectorPollOpts {
    * so each tenant can supply their own API keys via the UI.
    */
   credentials?: Record<string, string>;
+  /**
+   * Google Trends category filter. When supplied, the GoogleTrendsConnector
+   * fans out one fetch per category and tags each emitted signal with its
+   * category in the lineage string (`[cat:<id>]`). Other connectors ignore
+   * this field.
+   *
+   * Recognized ids on the legacy /trending/rss endpoint are limited:
+   *   ''  | 'all'  → top stories (default)
+   *   't'         → sports
+   *   'b'         → business
+   *   'e'         → entertainment
+   *   'm'         → sci/tech
+   *   'h'         → health
+   * Any other id is sent through but Google Trends will fall back to "all".
+   */
+  gtrendsCategories?: string[];
 }
 
 export interface ConnectorOk {
