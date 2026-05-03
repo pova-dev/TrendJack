@@ -20,16 +20,41 @@ const LABEL: Record<Recommendation, string> = {
   SAFE_PIVOT: 'SAFE PIVOT',
 };
 
-export function RecommendationBadge({ rec, className }: { rec: Recommendation; className?: string }) {
+export function RecommendationBadge({ rec, className, learnedDirection }: {
+  rec: Recommendation;
+  className?: string;
+  /** Optional indicator that calibration nudged this trend's ranking
+   *  in the operator's direction. 'up' = boosted (operator usually
+   *  saves this kind of trend); 'down' = dragged. Renders a tiny ↑/↓
+   *  glyph next to the badge. Feature D Phase 3. */
+  learnedDirection?: 'up' | 'down';
+}) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-sm px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wider',
-        STYLES[rec],
-        className,
+    <span className="inline-flex items-center gap-0.5">
+      <span
+        className={cn(
+          'inline-flex items-center rounded-sm px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wider',
+          STYLES[rec],
+          className,
+        )}
+      >
+        {LABEL[rec]}
+      </span>
+      {learnedDirection && (
+        <span
+          className={cn(
+            'text-2xs font-bold',
+            learnedDirection === 'up' ? 'text-good-400' : 'text-bad-400',
+          )}
+          title={
+            learnedDirection === 'up'
+              ? 'Calibration learned: you usually save this kind of trend → ranking boosted'
+              : 'Calibration learned: you usually dismiss this kind of trend → ranking dragged'
+          }
+        >
+          {learnedDirection === 'up' ? '↑' : '↓'}
+        </span>
       )}
-    >
-      {LABEL[rec]}
     </span>
   );
 }

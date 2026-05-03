@@ -183,6 +183,10 @@ export interface Trend {
   predictedPeakConfidence?: number;
   /** 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying' */
   cascadePhase?: string;
+  /** Calibration multiplier baked into opportunity at score time
+   *  (Feature D). 1.0 means no nudge yet. UI threshold for the
+   *  ↑/↓ glyph is `Math.abs(boost - 1) > 0.05`. */
+  calibrationBoost?: number;
   velocity: number;       // posts/hour or %change
   reach: number;
   sentiment: number;      // -1..1

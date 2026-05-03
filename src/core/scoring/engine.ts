@@ -109,6 +109,7 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
   // therefore changes ranking but never gating. Per CLAUDE.md hard
   // rule 4: opportunity drives dashboard sort, jackingScore drives
   // content-gen go/no-go — they serve different jobs.
+  let calibrationBoost = 1.0;
   if (ctx.calibrationProvider) {
     const boost = ctx.calibrationProvider(signal, {
       scores: {
@@ -116,6 +117,7 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
       },
     });
     if (Number.isFinite(boost) && boost > 0) {
+      calibrationBoost = boost;
       opportunity = Math.round(Math.max(0, Math.min(100, opportunity * boost)));
     }
   }
@@ -163,5 +165,6 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     brandKeywordHit: topicalFitResult.brandKeywordHit,
     matchedBrandKeywords: topicalFitResult.matchedBrandKeywords,
     jackingScore,
+    calibrationBoost,
   };
 }

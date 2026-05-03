@@ -60,23 +60,39 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [activeId, board.columns, trends]);
 
+  // Dismiss intercept — when the operator clicks Dismiss, surface a
+  // reason-chip modal first (Feature D Phase 3). The reason is
+  // forwarded to the action payload so the calibration agent can
+  // disambiguate "off-brand" vs "saturated" vs "wrong audience" etc.
+  // (see lib/store.ts:recordAction publisher → STREAMS.operatorFeedback).
+  // Skipping the modal still works — empty reason = generic dismiss.
+  const [pendingDismissId, setPendingDismissId] = React.useState<string | null>(null);
+
   async function onAction(id: string, type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin') {
-    // Optimistic local updates so the dashboard feels instant. The
-    // server's SSE 'trend.updated' broadcast will reconcile if anything
-    // diverges, but we don't wait for it.
+    // Dismiss → ask why first (the reason feeds calibration). Skip the
+    // modal when something else has already opened it (defensive — caller
+    // can pass a payload with reason directly via doAction).
+    if (type === 'dismiss' && !pendingDismissId) {
+      setPendingDismissId(id);
+      return;
+    }
+    return doAction(id, type);
+  }
+
+  async function doAction(
+    id: string,
+    type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin',
+    payload?: Record<string, unknown>,
+  ) {
     if (type === 'dismiss') {
       setTrends(prev => prev.filter(t => t.id !== id));
     } else if (type === 'pin') {
-      // Toggle pin state in local list. With pin moving cards to the
-      // Watchlist column exclusively, this makes the card visibly jump
-      // (or disappear from Watchlist on unpin) without waiting for the
-      // round-trip.
       setTrends(prev => prev.map(t => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
     }
     await fetch(`/api/trends/${id}/actions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type, payload }),
     });
     if (type === 'generate') {
       await fetch(`/api/trends/${id}/generate`, { method: 'POST' });
@@ -210,6 +226,15 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           onSave={saveColumn}
         />
       )}
+      <DismissReasonModal
+        trendId={pendingDismissId}
+        onCancel={() => setPendingDismissId(null)}
+        onSubmit={(reason) => {
+          const id = pendingDismissId;
+          setPendingDismissId(null);
+          if (id) void doAction(id, 'dismiss', reason ? { reason } : undefined);
+        }}
+      />
     </div>
   );
 }
@@ -237,4 +262,76 @@ function collectVisibleTrendIds(cols: ColumnConfig[], trends: Trend[]): string[]
     }
   }
   return out;
+}
+
+// Reason-chip modal — Feature D Phase 3. Operator picks one chip
+// (no free-text required) and the reason flows into the dismiss
+// action's payload, which the publisher includes in the
+// OperatorFeedbackMessage. The calibration agent doesn't currently
+// use the reason field for bucket math (Phase 4 will), but capturing
+// it now means the dataset is ready when we do.
+const DISMISS_REASONS = [
+  { id: 'off_brand',  label: 'Off-brand' },
+  { id: 'cringe',     label: 'Too cringe' },
+  { id: 'saturated',  label: 'Already saturated' },
+  { id: 'wrong_audience', label: 'Wrong audience' },
+  { id: 'not_now',    label: 'Not now' },
+  { id: 'low_fit',    label: 'Weak topical fit' },
+] as const;
+
+function DismissReasonModal({
+  trendId,
+  onCancel,
+  onSubmit,
+}: {
+  trendId: string | null;
+  onCancel: () => void;
+  onSubmit: (reason: string | null) => void;
+}) {
+  if (!trendId) return null;
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 motion-safe:transition-opacity pointer-events-auto"
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tj-dismiss-title"
+    >
+      <div
+        className="w-full sm:max-w-sm rounded-t-xl sm:rounded-xl bg-ink-900 border border-ink-700 shadow-pop p-4 m-2"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="tj-dismiss-title" className="text-sm font-semibold text-ink-100 mb-2">Why dismiss?</h2>
+        <p className="text-2xs text-ink-400 mb-3">
+          Optional — picking a reason teaches the dashboard to surface fewer
+          trends like this. Skip if it's a one-off.
+        </p>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {DISMISS_REASONS.map(r => (
+            <button
+              key={r.id}
+              onClick={() => onSubmit(r.id)}
+              className="rounded-md px-2.5 h-9 text-xs font-medium text-ink-200 bg-ink-800 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="h-9 px-3 rounded-md text-xs font-medium text-ink-300 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(null)}
+            className="h-9 px-3 rounded-md text-xs font-medium bg-ink-700 text-ink-100 hover:bg-ink-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+          >
+            Dismiss without reason
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

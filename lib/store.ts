@@ -278,6 +278,13 @@ export async function recordAction(trendId: string, type: ActionType, actor = 'u
 
     const { getBus } = await import('@/src/core/state');
     const { STREAMS } = await import('@/src/core/state/streams');
+    // Reason chip from the dismiss modal (Feature D Phase 3) flows in
+    // the action payload. Captured for the calibration audit trail —
+    // Phase 4 will use it for finer-grained bucket math (per-reason
+    // negative-polarity weighting).
+    const reason = (payload && typeof payload === 'object' && payload !== null && 'reason' in (payload as Record<string, unknown>))
+      ? String((payload as Record<string, unknown>).reason).slice(0, 200)
+      : undefined;
     await getBus().publish(STREAMS.operatorFeedback, {
       brandId: trendRow.brandId,
       trendId,
@@ -296,6 +303,7 @@ export async function recordAction(trendId: string, type: ActionType, actor = 'u
         recommendation: trendRow.recommendation,
         opportunity: typeof scores.opportunity === 'number' ? scores.opportunity : 0,
       },
+      reason,
       emittedAt: new Date(),
     });
   } catch {
@@ -487,6 +495,7 @@ function rowToTrend(r: Awaited<ReturnType<typeof prisma.trend.findUnique>>): Tre
     predictedPeakAt: r.predictedPeakAt?.toISOString(),
     predictedPeakConfidence: r.predictedPeakConfidence ?? undefined,
     cascadePhase: r.cascadePhase ?? undefined,
+    calibrationBoost: r.calibrationBoost ?? undefined,
     velocity: r.velocity,
     reach: Number(r.reach),
     sentiment: r.sentiment,
@@ -586,6 +595,7 @@ export async function persistScoredTrend(
         competitorClaimants: JSON.stringify(signal.competitorClaimants),
         brandKeywordHit: scoreResult.brandKeywordHit,
         matchedBrandKeywords: JSON.stringify(scoreResult.matchedBrandKeywords),
+        calibrationBoost: scoreResult.calibrationBoost ?? 1.0,
         url: signal.url ?? existing.url,
       },
     });
@@ -632,6 +642,7 @@ export async function persistScoredTrend(
       competitorClaimants: JSON.stringify(signal.competitorClaimants),
       brandKeywordHit: scoreResult.brandKeywordHit,
       matchedBrandKeywords: JSON.stringify(scoreResult.matchedBrandKeywords),
+      calibrationBoost: scoreResult.calibrationBoost ?? 1.0,
       formatFatigue: signal.formatFatigue,
       examples: JSON.stringify(signal.examples ?? []),
       url: signal.url,

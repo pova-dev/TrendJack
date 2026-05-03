@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { startIngestCron } from '@/lib/cron';
 import { bootAgents } from '@/lib/agents-boot';
 import { startLineageCron } from '@/lib/lineage-cron';
+import { startPlanLifecycleCron } from '@/lib/plan-cron';
 
 // Boot the background ingest cron + agentic pipeline + lineage cron
 // once per Node process. All three are idempotent via module-level
@@ -17,6 +18,7 @@ import { startLineageCron } from '@/lib/lineage-cron';
 startIngestCron();
 bootAgents();
 startLineageCron();
+startPlanLifecycleCron();
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();
