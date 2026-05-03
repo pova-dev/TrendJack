@@ -98,11 +98,13 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     weights.effort * effort;
   const opportunity = Math.round(clamp01(raw) * 100);
 
-  // --- Jacking Score / S_max (canonical signal strength) ------------------
-  // S_max = (FIT × VEL × FM) / (RISK + CRINGE + SAT)
-  // Drives the Creative Agent's go/no-go gate AND the Verifier auto-fire
-  // threshold. Lives alongside `opportunity` (additive composite for
-  // dashboard ranking).
+  // --- CVS / Jacking Score / S_max (canonical signal strength) -----------
+  // CVS = (FIT × VEL_eff × FM × Sp) / max(0.05, RISK + CRINGE + SAT_eff)
+  // VEL_eff uses ctx.reproductionRate when provided (Filter Agent computes
+  // it from TrendSample time-series); falls back to virality otherwise.
+  // Sp uses ctx.crossSourceCount; SAT_eff uses ctx.hoursSinceCompetitorClaim.
+  // All three default to no-op when omitted, so behavior stays stable for
+  // legacy callers that don't compute them.
   const jackingScore = computeJackingScore({
     fit: brandFit,
     velocity: virality,
@@ -110,6 +112,9 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     risk,
     cringe,
     saturation,
+    reproductionRate: ctx.reproductionRate,
+    crossSourceCount: ctx.crossSourceCount,
+    hoursSinceCompetitorClaim: ctx.hoursSinceCompetitorClaim,
   });
 
   const scores: Scores = {

@@ -64,15 +64,27 @@ export interface ScoringWeights {
   effort: number;     // negative weight magnitude
 }
 
+// Weight rebalance per audit recommendation: "FM should be weighted higher
+// than Total Reach because borrowing momentum is only possible before the
+// trend becomes saturated noise."
+//
+// Previously: virality 0.28 (×0.30 reach component = 0.084 effective weight
+// for reach), firstMover 0.10. FM was already marginally higher than the
+// reach contribution — but the gap was negligible.
+//
+// Now: virality 0.22 (still the heavy hitter), firstMover 0.16 (+60%),
+// brandFit 0.20 (slightly down), timing 0.14 (unchanged). FM contribution
+// is now ~2.4x the effective reach contribution. Saturation/risk/cringe
+// drag stays the same.
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-  virality: 0.28,
-  brandFit: 0.22,
+  virality: 0.22,
+  brandFit: 0.20,
   timing: 0.14,
-  firstMover: 0.10,
+  firstMover: 0.16,   // bumped from 0.10 — first-mover advantage emphasized
   saturation: 0.08,
   risk: 0.10,
   cringe: 0.06,
-  formatFatigue: 0.04,
+  formatFatigue: 0.02,
   effort: 0.02,
 };
 
