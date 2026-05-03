@@ -70,16 +70,17 @@ export function decide(
   // ---------------------------------------------------------------------
   // Hard topical floor (added post-Trinity-Swarm Solera audit).
   //
-  // Cross-category hallucination case: a gaming-phone trend scored for
-  // a footwear brand could end up at brandFit=0.26 (just above the
-  // composite floor) because tonalFit's neutral default of 0.55 and
-  // audienceOverlap's 0.35 base prop up the composite even when
-  // topicalFit collapses to the no-anchor floor. That's an actionable
-  // recommendation the system has no business making. Below 0.10
-  // topicalFit means: no brand keyword, no competitor, no soft-anchor,
-  // no theme — structurally off-topic.
+  // Designed to catch cross-category hallucinations (gaming-phone trend
+  // scored for a footwear brand → false MONITOR via tonalFit's 0.55
+  // neutral default propping up brandFit). Skipped for `google_trends`
+  // source: operators who configured gtrends ingestion deliberately
+  // opted into broad peripheral awareness — Mumbai trending in India
+  // is genuinely useful for a phone brand even if no brand keyword
+  // hits, and forcing IGNORE on every such item kills the column.
+  // The floor still applies to brand-keyword-targeted sources (reddit,
+  // news, x) where off-topic is genuinely a hallucination.
   // ---------------------------------------------------------------------
-  if (scores.topicalFit < 0.10) {
+  if (scores.topicalFit < 0.10 && s.source !== 'google_trends') {
     return {
       recommendation: 'IGNORE',
       recommendationReason: `Topical fit ${pct(scores.topicalFit)} — trend is structurally off-category for this brand.`,
