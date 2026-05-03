@@ -4,6 +4,13 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'TrendJack — POVA War Room',
   description: 'Real-time trend hijacking command center',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#0a0a10',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'TrendJack',
+  },
 };
 
 // No-FOUC theme bootstrap. Runs before paint to set html.dark / html.light
@@ -63,6 +70,17 @@ const ERROR_RELAY = `
 })();
 `.trim();
 
+// Service-worker registration. Wires the PWA install + push delivery
+// path. Only registers in production (`navigator.serviceWorker` is
+// available in dev too but Next's HMR + SW caching interact badly).
+const SW_REGISTER = `
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('/sw.js').catch(function(e){
+    console.warn('[tj-sw] register failed:', e && e.message);
+  });
+}
+`.trim();
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // suppressHydrationWarning because the theme-bootstrap script mutates
   // <html>'s class before React hydrates; that's expected and we don't
@@ -74,6 +92,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script dangerouslySetInnerHTML={{ __html: ERROR_RELAY }} />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script dangerouslySetInnerHTML={{ __html: SW_REGISTER }} />
       </head>
       <body>{children}</body>
     </html>
