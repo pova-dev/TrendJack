@@ -68,6 +68,25 @@ export function decide(
   }
 
   // ---------------------------------------------------------------------
+  // Hard topical floor (added post-Trinity-Swarm Solera audit).
+  //
+  // Cross-category hallucination case: a gaming-phone trend scored for
+  // a footwear brand could end up at brandFit=0.26 (just above the
+  // composite floor) because tonalFit's neutral default of 0.55 and
+  // audienceOverlap's 0.35 base prop up the composite even when
+  // topicalFit collapses to the no-anchor floor. That's an actionable
+  // recommendation the system has no business making. Below 0.10
+  // topicalFit means: no brand keyword, no competitor, no soft-anchor,
+  // no theme — structurally off-topic.
+  // ---------------------------------------------------------------------
+  if (scores.topicalFit < 0.10) {
+    return {
+      recommendation: 'IGNORE',
+      recommendationReason: `Topical fit ${pct(scores.topicalFit)} — trend is structurally off-category for this brand.`,
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // Safe Pivot — high brand-fit + elevated risk + clean tone.
   //
   // The exact "high-fit + high-risk + clean tone" sweet spot the audit

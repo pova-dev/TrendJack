@@ -41,7 +41,12 @@ export type { RawSignal, ScoreResult, ScoringContext };
 export { predictPeakWindowEnd };
 
 export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
-  const weights = ctx.weights ?? ctx.brand.scoringWeights ?? DEFAULT_WEIGHTS;
+  // Merge with DEFAULT_WEIGHTS so a brand seeded with `scoringWeights = {}`
+  // (the empty-JSON case `parseJSON` returns from a literal `{}` row) doesn't
+  // leave individual axis multipliers undefined and propagate NaN through the
+  // opportunity composite. Discovered via the Trinity Swarm Solera audit.
+  const rawWeights = ctx.weights ?? ctx.brand.scoringWeights ?? {};
+  const weights = { ...DEFAULT_WEIGHTS, ...rawWeights };
   const rationale: ScoreRationale[] = [];
 
   // --- Brand-fit composite (50% topical + 30% tonal + 20% audience) -------

@@ -62,11 +62,22 @@ export function analyzeResonance(
   // For brands with anti-cliché voice, trends where the smart move is
   // self-aware humor get a +20% multiplier on S_max. Computed once and
   // surfaced for both the UI and the Filter Agent's enrichSignal hook.
+  //
+  // Tightened predicate (Trinity Swarm Solera audit, B4): both signals
+  // must be present — a humor-lexicon hit AND either a competitor in
+  // the conversation OR an explicit meme/satire framing. The previous
+  // `OR` formulation made every serious competitor news item activate
+  // irony, which is exactly the wrong recommendation for sober
+  // industry coverage like a price-drop announcement.
   const voiceFitsIrony = ANTI_CLICHE_VOICES.test(brand.tone.voice);
+  const titleBlob = (signal.title + ' ' + signal.summary).toLowerCase();
+  const hasHumorMarker = HEAVY_HUMOR_HOOKS.some(h => titleBlob.includes(h))
+    || /\b(parod(?:y|ies|ied)|roast(?:ed|ing)?|satire|skit|deadpan|absurd)\b/i.test(titleBlob);
   const trendInvitesIrony =
     cringe < 0.20 &&                                                // trend itself isn't cringey
-    (HEAVY_HUMOR_HOOKS.some(h => signal.title.toLowerCase().includes(h)) ||
-     signal.competitorClaimants.length > 0);                        // OR competitor stumble = irony fuel
+    hasHumorMarker &&                                                // explicit humor framing required
+    (signal.competitorClaimants.length > 0                           // competitor in the conversation, OR
+     || HEAVY_HUMOR_HOOKS.some(h => signal.title.toLowerCase().includes(h))); // pure humor trend
   const ironicAlignmentMultiplier = (voiceFitsIrony && trendInvitesIrony) ? 1.20 : 1.00;
 
   // Why Now string -------------------------------------------------------

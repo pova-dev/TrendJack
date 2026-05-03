@@ -54,13 +54,26 @@ export function computeTopicalFitDetailed(
     .filter(c => c.length >= 2 && !brandKeywords.includes(c) && matchKeyword(haystack, c));
   const hasCompetitor = competitorMatches.length > 0;
 
-  // 3. Soft anchor — generic tech/phone vocabulary.
+  // 3. Soft anchor — derived FROM the brand's category, not hardcoded.
+  // Earlier this was hardcoded to a smartphone vocabulary plus optional
+  // category words, which made every gaming-phone trend hit the soft-
+  // anchor for unrelated brands (footwear, finance, etc.) — a major
+  // cross-category hallucination source surfaced by the Trinity Swarm
+  // Solera audit. Now we only widen to the smartphone preset when the
+  // brand's category text actually mentions tech/phone/mobile/electronics.
+  const categoryWords = b.category.toLowerCase()
+    .split(/[\s,/&-]+/)
+    .filter(w => w.length >= 4);
+  const isTechBrand = /\b(phone|smartphone|mobile|electronics?|tech|device|gadget|consumer\s*tech)\b/i.test(b.category);
   const softAnchorVocab = new Set<string>([
-    'phone', 'phones', 'smartphone', 'smartphones', 'mobile', 'handset',
-    'android', 'ios', 'iphone', 'flagship', 'oled', 'amoled', '5g',
-    ...b.category.toLowerCase().split(/[\s,/]+/).filter(w => w.length >= 4),
+    ...categoryWords,
+    ...(isTechBrand
+      ? ['phone', 'phones', 'smartphone', 'smartphones', 'mobile', 'handset',
+         'android', 'ios', 'iphone', 'flagship', 'oled', 'amoled', '5g']
+      : []),
   ]);
-  const hasSoftAnchor = [...softAnchorVocab].some(a => haystack.includes(a));
+  const hasSoftAnchor = softAnchorVocab.size > 0
+    && [...softAnchorVocab].some(a => haystack.includes(a));
 
   // Theme hits — brand.safeThemes (battery, gaming, …).
   const themeMatches = b.safeThemes.filter(t => haystack.includes(t.toLowerCase()));
