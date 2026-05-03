@@ -2,6 +2,14 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+// Drawer behavior:
+//   ≥sm (desktop / tablet): right-side panel, configurable width.
+//   <sm (mobile): bottom-sheet — full viewport width, 92vh tall, slides
+//                  up from the bottom. Drag handle at the top is visual
+//                  only; tap-outside or Escape to dismiss.
+//
+// The single Drawer surface auto-adapts via Tailwind responsive
+// utilities — no JS branching, no parent-driven layout switch.
 export function Drawer({
   open,
   onClose,
@@ -36,13 +44,32 @@ export function Drawer({
       <aside
         role="dialog"
         aria-modal="true"
-        style={{ width }}
+        // Inline width is desktop-only — overridden by sm:max-w / mobile
+        // utilities below. We can't conditionally omit `style` because
+        // the value is computed from props, so we pass it always and let
+        // the mobile classes win via `sm:` reset of width.
+        style={{ width: typeof window !== 'undefined' && window.innerWidth >= 640 ? width : undefined }}
         className={cn(
-          'absolute right-0 top-0 h-full bg-ink-900 border-l border-ink-700 shadow-pop',
-          'transition-transform duration-150 ease-out',
-          open ? 'translate-x-0' : 'translate-x-full',
+          // Desktop: side drawer, anchored right.
+          'sm:absolute sm:right-0 sm:top-0 sm:h-full sm:border-l sm:border-ink-700',
+          // Mobile: bottom-sheet pinned to the bottom edge.
+          'absolute left-0 right-0 bottom-0 sm:left-auto h-[92vh] sm:h-full',
+          // Visual + transition.
+          'bg-ink-900 shadow-pop rounded-t-xl sm:rounded-none',
+          'transition-transform duration-200 ease-out',
+          // Open / closed transforms differ by axis: slide-from-bottom on
+          // mobile, slide-from-right on desktop.
+          open
+            ? 'translate-y-0 sm:translate-x-0'
+            : 'translate-y-full sm:translate-y-0 sm:translate-x-full',
         )}
       >
+        {/* Mobile-only drag handle. Decorative — actual dismiss is
+            tap-outside or Escape. Could be wired to pointer-events
+            for a swipe-down gesture in a follow-up. */}
+        <div className="sm:hidden flex justify-center py-2">
+          <div className="w-10 h-1 rounded-full bg-ink-600" />
+        </div>
         <div className="h-full overflow-y-auto">{children}</div>
       </aside>
     </div>
