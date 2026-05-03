@@ -7,6 +7,7 @@ import { ConnectorStatusBar } from '@/components/shell/ConnectorStatusBar';
 import { AiSetupBanner } from '@/components/shell/AiSetupBanner';
 import { requireBrand } from '@/lib/auth';
 import { AddColumnButton } from '@/components/shell/AddColumnButton';
+import { GuidedTour } from '@/components/shell/GuidedTour';
 import { getOrgCredentials } from '@/lib/credentials';
 import { aiHealth } from '@/lib/ai/provider';
 
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
       <AiSetupBanner configured={aiConfigured} />
       <Board initialBoard={board} initialTrends={trends} brandId={brand.id} />
       <ConnectorStatusBar statuses={connectorStatuses} />
+      <GuidedTour />
     </>
   );
 }

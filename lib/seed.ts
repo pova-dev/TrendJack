@@ -5,11 +5,17 @@ import { prisma } from './db';
 import { getAllMockSignals } from '@/lib/connectors/mock';
 import { score } from '@/lib/scoring/engine';
 import { getBrand } from './store';
+import { pickSeedForBrand } from './seed-corpora';
 
 export async function seedTrendsForBrand(brandId: string) {
   const brand = await getBrand(brandId);
   if (!brand) throw new Error('brand_not_found');
-  const signals = getAllMockSignals();
+  // Category-aware seed corpus pick. Falls back to the legacy mock signals
+  // (POVA-flavored) only when the brand's category text doesn't match any
+  // known bucket — preserves backwards compatibility for existing flows
+  // that don't pass a recognizable category.
+  const categorySeed = pickSeedForBrand(brand.category, brand.name);
+  const signals = categorySeed.length > 0 ? categorySeed : getAllMockSignals();
 
   for (const s of signals) {
     const r = score(s, { brand });
