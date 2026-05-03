@@ -67,6 +67,18 @@ export function BrandEditor({ initial }: Props) {
           <Field label="Markets" className="mt-3">
             <ChipInput value={brand.markets} onChange={markets => patchAndSave({ markets })} placeholder="India, SEA…" />
           </Field>
+          <Field label="Sub-locality slug (optional)" className="mt-3">
+            <input
+              value={brand.geoSubregion ?? ''}
+              onChange={e => patchAndSave({ geoSubregion: e.target.value })}
+              className={inputCls}
+              placeholder="mumbai · bengaluru · new-york"
+            />
+            <p className="mt-1 text-2xs text-ink-400">
+              City / region slug used by the <span className="font-mono text-flare-400">X Trending Now</span> connector
+              (powered by trends24.in). Lowercase, dash-separated. Leave blank for country-level trends.
+            </p>
+          </Field>
         </div>
 
         <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
@@ -162,6 +174,24 @@ export function BrandEditor({ initial }: Props) {
         </div>
 
         <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-sm font-semibold text-ink-100">Competitor Meta Page IDs</h2>
+            <Chip tone="neutral">grounds Meta Ad Library</Chip>
+          </div>
+          <p className="text-2xs text-ink-300 mb-3">
+            Map each competitor to its Facebook Page ID so the <span className="font-mono text-flare-400">Meta Ad Library</span> connector
+            deep-links via <span className="font-mono">view_all_page_id</span> instead of fuzzy keyword search.
+            To find a Page ID: open the brand's Facebook page → About → bottom of page (or right-click ▸ View source ▸ search <span className="font-mono">page_id</span>).
+            Without a Page ID, the connector falls back to keyword search and tags the result <span className="font-mono">search-fallback</span>.
+          </p>
+          <CompetitorPageIdMatrix
+            competitors={brand.competitors}
+            value={brand.competitorPageIds ?? {}}
+            onChange={competitorPageIds => patchAndSave({ competitorPageIds })}
+          />
+        </div>
+
+        <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
           <h2 className="text-sm font-semibold text-ink-100 mb-2">Audience</h2>
           <Field label="Primary segments">
             <ChipInput value={brand.audience.primary} onChange={v => patchAndSave({ audience: { ...brand.audience, primary: v } })} placeholder="Gen Z, students, gamers…" />
@@ -238,5 +268,57 @@ function Field({ label, children, className }: { label: string; children: React.
       <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+// Per-competitor Facebook Page ID matrix. Renders one row per competitor
+// with a free-text input. Empty value => keyword fallback at ingest time.
+function CompetitorPageIdMatrix({
+  competitors,
+  value,
+  onChange,
+}: {
+  competitors: string[];
+  value: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
+  if (competitors.length === 0) {
+    return (
+      <p className="text-2xs text-ink-400 italic">
+        Add competitors above to start mapping their Facebook Page IDs.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {competitors.map(c => {
+        const id = value[c] ?? '';
+        return (
+          <div key={c} className="flex items-center gap-2">
+            <span className="w-32 shrink-0 font-mono text-xs text-ink-200 truncate" title={c}>
+              {c}
+            </span>
+            <input
+              value={id}
+              onChange={e => {
+                const next = { ...value };
+                const v = e.target.value.trim();
+                if (v) next[c] = v;
+                else delete next[c];
+                onChange(next);
+              }}
+              className="flex-1 h-8 px-2 rounded-md bg-ink-800 border border-ink-700 text-xs text-ink-100 font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400"
+              placeholder="468179233051434"
+              inputMode="numeric"
+            />
+            {id ? (
+              <Chip tone="good">grounded</Chip>
+            ) : (
+              <Chip tone="warn">fallback</Chip>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

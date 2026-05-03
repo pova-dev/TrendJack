@@ -92,6 +92,19 @@ model Brand {
   ///   'm' → sci/tech             'h' → health
   /// Auto-suggested at brand creation from `category` text.
   gtrendsCategories String        @default("[]")
+  /// Optional sub-locality slug (e.g. 'mumbai', 'new-york') for
+  /// connectors that support city-level drilldown (X Trending via
+  /// trends24.in). Empty = country-level only. Lowercase-dashed.
+  geoSubregion      String        @default("")
+  /// JSON map of competitorName → Facebook Page ID for Meta Ad Library
+  /// deep-linking. With the page ID, the connector hits Meta's
+  /// `view_all_page_id=<id>` URL which targets the exact page's active
+  /// ads rather than a fuzzy keyword search. Operators paste IDs from
+  /// each competitor's FB page transparency section.
+  /// Example: {"Samsung":"11648534","Xiaomi":"100..."}
+  /// Empty / missing competitors fall back to keyword search with a
+  /// "search-fallback" tag in the lineage.
+  competitorPageIds String        @default("{}")
   safeThemes        String        @default("[]")
   competitors       String        @default("[]")
   priorityPlatforms String        @default("[]")

@@ -31,6 +31,12 @@ export interface ScoutContext {
   /** Default geography for connectors that support it (Google Trends).
    *  ISO country code (e.g. 'IN' for India). */
   geo?: string;
+  /** Optional sub-locality slug (e.g. 'mumbai') for connectors that
+   *  support city-level drilldown (X Trending via trends24). */
+  geoSubregion?: string;
+  /** competitorName → Facebook Page ID map for the Meta Ad Library
+   *  connector. */
+  competitorPageIds?: Record<string, string>;
 }
 
 export interface ScoutPollOutcome {
@@ -79,6 +85,8 @@ export function connectorFn(c: Connector): ConnectorFn {
       credentials: ctx.credentials,
       gtrendsCategories: ctx.gtrendsCategories,
       geo: ctx.geo,
+      geoSubregion: ctx.geoSubregion,
+      competitorPageIds: ctx.competitorPageIds,
     });
     if (result.ok) {
       return { ok: true, signals: result.signals };

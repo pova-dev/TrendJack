@@ -492,6 +492,91 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
   );
 }
 
+// ─── Draft Voice Lint widget (inline brand-voice check) ──────────────────
+//
+// Compact strip rendered below each AI-generated draft. Calls the same
+// /api/brand/voice-lint endpoint as the standalone /brand panel, but
+// renders only the verdict pill + offending-vocab counts inline. The
+// operator can click the verdict to expand into the offending-token
+// list. Scores against the brand's tone profile that the score engine
+// uses to filter incoming trends — applied in reverse to outgoing copy.
+interface DraftLintResult {
+  cringe: number;
+  tonalFit: number;
+  verdict: 'clean' | 'caution' | 'rewrite' | 'fail';
+  hits: Array<{ category: string; match: string; weight: 'high' | 'medium' | 'low' }>;
+  summary: { bannedPhrases: number; cliche: number; adSpeak: number; hype: number; forcedSlang: number; forbiddenStyle: number };
+}
+const DRAFT_VERDICT_TONE = {
+  clean: 'good', caution: 'flare', rewrite: 'warn', fail: 'bad',
+} as const;
+const DRAFT_VERDICT_LABEL = {
+  clean: '✓ Clean', caution: '⚠ Caution', rewrite: '! Rewrite', fail: '✗ Hard kill',
+} as const;
+function DraftVoiceLint({ text }: { text: string }) {
+  const [result, setResult] = React.useState<DraftLintResult | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!text.trim()) { setResult(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    fetch('/api/brand/voice-lint', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (!cancelled && j) setResult(j); })
+      .catch(() => { /* swallow — the standalone /brand linter handles fuller errors */ })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [text]);
+
+  if (loading || !result) return null;
+
+  const totalHits = result.hits.length;
+  return (
+    <div className="mt-2 rounded border border-ink-700 bg-ink-900/40 p-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center gap-1.5 text-2xs hover:text-ink-100"
+        aria-expanded={expanded}
+      >
+        <Chip tone={DRAFT_VERDICT_TONE[result.verdict]} className="text-2xs">
+          {DRAFT_VERDICT_LABEL[result.verdict]}
+        </Chip>
+        <span className="font-mono text-ink-300">cringe {Math.round(result.cringe * 100)}</span>
+        <span className="text-ink-500">·</span>
+        <span className="font-mono text-ink-300">fit {Math.round(result.tonalFit * 100)}</span>
+        {totalHits > 0 && (
+          <span className="text-ink-300">
+            · {totalHits} hit{totalHits === 1 ? '' : 's'}
+          </span>
+        )}
+        <span className="ml-auto text-ink-500">{expanded ? '−' : '+'}</span>
+      </button>
+      {expanded && totalHits > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-2xs max-h-32 overflow-y-auto">
+          {result.hits.slice(0, 12).map((h, i) => (
+            <li key={i} className="flex items-center gap-1.5">
+              <Chip
+                tone={h.weight === 'high' ? 'bad' : h.weight === 'medium' ? 'warn' : 'neutral'}
+                className="text-2xs flex-shrink-0"
+              >
+                {h.category}
+              </Chip>
+              <span className="font-mono text-ink-300 truncate">{h.match}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ─── Memory section (Trend Memory — historical analogs) ──────────────────
 //
 // Looks up the brand's past trends with the same content fingerprint
@@ -736,12 +821,15 @@ interface RoomShape {
   votes: { id: string; userId: string; angleId: string; weight: number }[];
 }
 
+interface PresenceParticipant { userId: string; userName: string; lastPingAt: number }
+
 function RoomTab({ trendId }: { trendId: string }) {
   const [room, setRoom] = React.useState<RoomShape | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [body, setBody] = React.useState('');
   const [posting, setPosting] = React.useState(false);
+  const [presence, setPresence] = React.useState<PresenceParticipant[]>([]);
 
   const reload = React.useCallback(async () => {
     setLoading(true);
@@ -759,6 +847,31 @@ function RoomTab({ trendId }: { trendId: string }) {
   }, [trendId]);
 
   React.useEffect(() => { void reload(); }, [reload]);
+
+  // Presence heartbeat — only runs when a room exists. 10s ping cadence
+  // matched by the server's 30s TTL = up to 2 missed pings before drop.
+  // Best-effort DELETE on unmount; tabs that close without unmount are
+  // pruned by TTL on next read.
+  React.useEffect(() => {
+    if (!room) return;
+    let cancelled = false;
+    async function tick() {
+      try {
+        const r = await fetch(`/api/trends/${trendId}/room/presence`, { method: 'POST' });
+        if (!r.ok || cancelled) return;
+        const j = await r.json();
+        if (Array.isArray(j.participants)) setPresence(j.participants);
+      } catch { /* swallow — presence is best-effort */ }
+    }
+    void tick();
+    const iv = setInterval(tick, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      // Best-effort disconnect — keepalive so the request survives unmount.
+      try { void fetch(`/api/trends/${trendId}/room/presence`, { method: 'DELETE', keepalive: true }); } catch { /* ignore */ }
+    };
+  }, [room, trendId]);
 
   async function openRoom() {
     setLoading(true);
@@ -817,6 +930,23 @@ function RoomTab({ trendId }: { trendId: string }) {
           <span className="text-2xs font-mono text-ink-400">{room.comments.length} comments · {room.votes.length} votes</span>
         </span>
       }>
+        {presence.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="text-2xs font-mono uppercase tracking-wider text-ink-400">
+              Live · {presence.length}
+            </span>
+            {presence.map(p => (
+              <span
+                key={p.userId}
+                title={`${p.userName} · last ping ${Math.round((Date.now() - p.lastPingAt) / 1000)}s ago`}
+                className="inline-flex items-center gap-1 rounded-full border border-good-500/40 bg-good-500/10 px-1.5 py-0.5 text-2xs text-good-300"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-good-400 animate-pulse" />
+                {p.userName.length > 14 ? `${p.userName.slice(0, 13)}…` : p.userName}
+              </span>
+            ))}
+          </div>
+        )}
         {room.status === 'decided' && room.decidedAngle && (
           <div className="mb-3 rounded border border-good-500/40 bg-good-500/5 p-2 text-2xs">
             <p className="text-good-400 font-mono uppercase tracking-wider mb-0.5">Decided</p>
@@ -1355,36 +1485,51 @@ function DraftsTab({ result, generating, onGenerate }: {
           No drafts produced. {result.aiError ? 'Fix the error above and try again.' : 'Try regenerate.'}
         </div>
       )}
-      {drafts.map((d, i) => (
-        <article key={i} className="rounded-md border border-ink-700 bg-ink-800/50 p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Chip tone={
-              d.variant === 'bold' ? 'flare' :
-              d.variant === 'meme' ? 'info' :
-              d.variant === 'reel' || d.variant === 'carousel' ? 'info' :
-              'good'
-            }>{String(d.variant)}</Chip>
-            <Chip tone="neutral">{String(d.platform)}</Chip>
-            <span className="ml-auto text-2xs text-ink-300">cringe {Math.round((Number(d.cringeScore) || 0) * 100)}</span>
-          </div>
-          <p className="font-semibold text-ink-100">{String(d.hook)}</p>
-          <p className="text-ink-200 mt-1">{String(d.body)}</p>
-          {d.cta && <p className="text-flare-400 mt-1 font-mono text-2xs uppercase">{String(d.cta)}</p>}
-          {d.visualBrief && <p className="text-2xs text-ink-300 mt-1.5">📐 {String(d.visualBrief)}</p>}
-          {d.whyItWorks && <p className="text-2xs text-ink-300 mt-1.5 italic">why it works: {String(d.whyItWorks)}</p>}
-          {d.whatNotToSay && (
-            <p className="text-2xs text-signal-red/80 mt-1.5">
-              <span className="font-mono uppercase mr-1">avoid:</span>{String(d.whatNotToSay)}
-            </p>
-          )}
-          <div className="flex gap-1 mt-2">
-            <Button size="xs">Edit</Button>
-            <Button size="xs" variant="ghost">Send to Slack</Button>
-            <Button size="xs" variant="ghost">Send to Telegram</Button>
-            <Button size="xs" variant="outline" className="ml-auto">Submit for approval</Button>
-          </div>
-        </article>
-      ))}
+      {drafts.map((d, i) => {
+        // Concatenate the hook + body + cta to lint as one piece of copy.
+        // The Voice Linter sidebar runs the same scoring used to filter
+        // incoming trends — applied here in reverse to flag what the AI
+        // wrote before the operator ships.
+        const draftText = [d.hook, d.body, d.cta]
+          .filter(s => typeof s === 'string' && s.trim())
+          .map(String)
+          .join(' \n\n ');
+        return (
+          <article key={i} className="rounded-md border border-ink-700 bg-ink-800/50 p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Chip tone={
+                d.variant === 'bold' ? 'flare' :
+                d.variant === 'meme' ? 'info' :
+                d.variant === 'reel' || d.variant === 'carousel' ? 'info' :
+                'good'
+              }>{String(d.variant)}</Chip>
+              <Chip tone="neutral">{String(d.platform)}</Chip>
+              <span className="ml-auto text-2xs text-ink-300">cringe {Math.round((Number(d.cringeScore) || 0) * 100)}</span>
+            </div>
+            <p className="font-semibold text-ink-100">{String(d.hook)}</p>
+            <p className="text-ink-200 mt-1">{String(d.body)}</p>
+            {d.cta && <p className="text-flare-400 mt-1 font-mono text-2xs uppercase">{String(d.cta)}</p>}
+            {d.visualBrief && <p className="text-2xs text-ink-300 mt-1.5">📐 {String(d.visualBrief)}</p>}
+            {d.whyItWorks && <p className="text-2xs text-ink-300 mt-1.5 italic">why it works: {String(d.whyItWorks)}</p>}
+            {d.whatNotToSay && (
+              <p className="text-2xs text-signal-red/80 mt-1.5">
+                <span className="font-mono uppercase mr-1">avoid:</span>{String(d.whatNotToSay)}
+              </p>
+            )}
+            {/* Voice Linter sidebar — runs the same scoring engine that
+                filters incoming trends, applied in reverse to the draft
+                output. Surfaces banned-phrase / forbidden-style hits
+                BEFORE the operator hits Submit. */}
+            <DraftVoiceLint text={draftText} />
+            <div className="flex gap-1 mt-2">
+              <Button size="xs">Edit</Button>
+              <Button size="xs" variant="ghost">Send to Slack</Button>
+              <Button size="xs" variant="ghost">Send to Telegram</Button>
+              <Button size="xs" variant="outline" className="ml-auto">Submit for approval</Button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
