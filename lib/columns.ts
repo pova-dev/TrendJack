@@ -40,6 +40,10 @@ const SECONDARY_TYPES = new Set<ColumnType>([
 ]);
 function isPrimary(col: { type: ColumnType; filters: ColumnFilters }): boolean {
   if (OBSERVER_TYPES.has(col.type) || SECONDARY_TYPES.has(col.type)) return false;
+  // Explicit operator opt-out via filters.observerOnly — column taps
+  // without claiming. Used for "all categories" catch-all panels that
+  // intentionally duplicate items already shown in narrower lanes.
+  if (col.filters.observerOnly) return false;
   // Any column with a strong specificity filter qualifies as primary.
   return !!(
     col.filters.brandKeywordOnly ||
@@ -154,10 +158,14 @@ export function assignTrendsToColumns(
     for (const t of matches) claimed.add(t.id);
   }
 
-  // Phase 3: OBSERVER columns (Alerts / Risk / Decay / Compliance /
-  // Crisis) — full unfiltered tap, see EVERYTHING matching their filter.
+  // Phase 3: OBSERVER columns — full unfiltered tap. Two ways in:
+  //   1. Type-based (Alerts / Risk Watch / Decay / Compliance / Crisis)
+  //   2. Explicit opt-out via filters.observerOnly — for operator-built
+  //      "all categories" catch-alls that intentionally duplicate items
+  //      already claimed by narrower columns.
   for (const col of cols) {
-    if (!OBSERVER_TYPES.has(col.type)) continue;
+    const isObserver = OBSERVER_TYPES.has(col.type) || col.filters.observerOnly;
+    if (!isObserver) continue;
     let matches = applyColumnFilter(col, trends);
     if (col.filters.clusterSimilar) matches = clusterByBrandKeyword(matches);
     result.set(col.id, matches);
