@@ -1,0 +1,48 @@
+name: 🐛 Bug report
+description: Something is broken — a route 500s, a UI element doesn't work, data isn't refreshing.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The more specific you are, the faster this gets fixed.
+  - type: input
+    id: page-or-route
+    attributes:
+      label: Page or API route
+      placeholder: e.g. /scoring, /api/trends/[id]/generate
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: One paragraph. What did you do, what did you expect, what did you see?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Steps that reliably reproduce. Bonus points for a curl command.
+      placeholder: |
+        1. Sign in via /dev/login
+        2. Click "Refresh from web"
+        3. Open any trend → click Generate
+        4. Drafts tab shows ...
+  - type: textarea
+    id: server-log
+    attributes:
+      label: Server log
+      description: Last 30 lines of `npm run dev` output, especially any `[CLIENT ERROR]` or `⨯` lines.
+      render: shell
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        - OS: macOS 26
+        - Browser: Arc / Chrome 130 / etc
+        - Node: v20.18.0
+        - DB: SQLite / Postgres 16
+        - Deploy: dev / Vercel / Docker / Railway

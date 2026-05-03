@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Theme tokens. Each --ink-X holds an "R G B" triple so Tailwind's
+   <alpha-value> helper still works (bg-ink-700/40, etc).
+
+   Default = dark. html.light overrides for the light theme. The toggle
+   in TopBar flips a class on <html>; an inline script in layout.tsx sets
+   the class before paint to avoid FOUC.
+
+   Naming convention (think hardness, not brightness):
+     950 → deepest chrome (dark) / brightest paper (light)
+     100 → the loudest text
+   ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+  /* Dark theme — current war-room values */
+  --ink-950:  10  10  16;
+  --ink-900:  17  17  26;
+  --ink-850:  24  24  35;
+  --ink-800:  33  33  49;
+  --ink-700:  44  44  63;
+  --ink-600:  58  58  79;
+  --ink-500:  90  90 117;
+  --ink-400: 133 133 165;
+  --ink-300: 176 176 200;
+  --ink-200: 212 212 224;
+  --ink-100: 240 240 248;
+
+  --bg:        rgb(var(--ink-900));
+  --fg:        rgb(var(--ink-100));
+  --selection-bg: #FF6A1A;
+  --selection-fg: #07070A;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgb(var(--ink-700));
+  --scrollbar-thumb-hover: rgb(var(--ink-600));
+  --kbd-border: rgba(255, 255, 255, 0.08);
+}
+
+html.light {
+  color-scheme: light;
+  /* Inverted ladder: 950 = brightest paper, 100 = deepest text. We keep
+     the orange brand + signal palette unchanged so brand identity is
+     consistent across themes. */
+  --ink-950: 255 255 255;   /* page paper */
+  --ink-900: 248 249 252;   /* body bg */
+  --ink-850: 255 255 255;   /* surface (cards) */
+  --ink-800: 240 242 247;   /* hover surface */
+  --ink-700: 220 224 232;   /* borders */
+  --ink-600: 196 202 214;   /* chip surface */
+  --ink-500: 142 150 168;   /* tertiary text */
+  --ink-400: 102 110 130;   /* secondary muted */
+  --ink-300:  82  90 110;   /* secondary body */
+  --ink-200:  44  52  70;   /* primary body */
+  --ink-100:  17  24  39;   /* headlines */
+
+  --selection-bg: #FF6A1A;
+  --selection-fg: #ffffff;
+  --scrollbar-thumb: rgb(var(--ink-600));
+  --scrollbar-thumb-hover: rgb(var(--ink-500));
+  --kbd-border: rgba(0, 0, 0, 0.12);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Smooth out the toggle so the theme flip doesn't feel jarring. */
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+/* Scrollbar — slim, theme-aware. */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+kbd {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  border: 1px solid var(--kbd-border);
+}
+
+/* Light-mode shadow overrides — the dark-mode shadows use harsh black
+   that looks dirty on paper. Soften them when light. */
+html.light .shadow-col {
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+}
+html.light .shadow-pop {
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+/* Utility used by some cards. */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

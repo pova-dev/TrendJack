@@ -1,0 +1,176 @@
+'use client';
+import * as React from 'react';
+import type { Trend } from '@/types';
+import { cn, relTime, timeUntil } from '@/lib/utils';
+import { SourceIcon, sourceLabel } from './SourceIcon';
+import { VelocityIndicator } from './VelocityIndicator';
+import { RecommendationBadge } from './RecommendationBadge';
+import { ScoreChip } from './ScoreChip';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { resolveSourceUrl } from '@/lib/source-link';
+
+interface Props {
+  trend: Trend;
+  active?: boolean;
+  onOpen: (id: string) => void;
+  onAction: (id: string, type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin') => void;
+}
+
+export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, onAction }: Props) {
+  const peak = timeUntil(trend.peakWindowEnd);
+  const isHero = trend.recommendation === 'POST_NOW';
+
+  // Compute decay state (past 70% of estimated life) directly from
+  // timestamps, independent of recommendation. Cards in decay should
+  // look visually faded everywhere they appear — Decay Watch column,
+  // search results, the trend drawer — so the operator gets a consistent
+  // "this is past peak" cue.
+  const peakMs  = trend.peakWindowEnd ? new Date(trend.peakWindowEnd).getTime() : 0;
+  const startMs = new Date(trend.firstSeenAt).getTime();
+  const lifeRatio = peakMs > startMs ? (Date.now() - startMs) / (peakMs - startMs) : 0;
+  const isDecaying = lifeRatio > 0.7;
+  const delta = trend.velocityDelta;
+  const showDelta = typeof delta === 'number' && Math.abs(delta) > 0.15;
+
+  return (
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(trend.id)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') onOpen(trend.id);
+        if (e.key === 'o') { e.preventDefault(); window.open(resolveSourceUrl(trend), '_blank'); }
+      }}
+      className={cn(
+        'group relative cursor-pointer border-l-2 px-3 py-2 transition-colors',
+        'hover:bg-ink-800/60 focus-visible:bg-ink-800/60 focus:outline-none',
+        active ? 'bg-ink-800' : 'bg-ink-900',
+        isHero ? 'border-flare-500' : 'border-transparent',
+        trend.pinned && 'bg-flare-500/[0.04]',
+        // Three visual tiers:
+        //   1. Decaying (past 70% of peak life): heavy fade + grayscale.
+        //      Independent of recommendation, so Decay Watch always reads
+        //      as decayed regardless of why we're showing the trend.
+        //   2. Plain IGNORE (off-brand, low-fit, etc.): mid fade. Visible
+        //      enough for peripheral awareness, dim enough to clearly
+        //      signal "don't act on this".
+        //   3. Toxic IGNORE (cringe trap / banned topic / competitor
+        //      doubled): heaviest fade — same as decaying.
+        isDecaying && 'opacity-50 grayscale',
+        !isDecaying && trend.recommendation === 'IGNORE' && (
+          trend.scores.cringe > 0.7 ||
+          trend.scores.topicalFit === 0 ||
+          trend.competitorClaimants.length >= 2
+            ? 'opacity-50 grayscale'
+            : 'opacity-80'  // gentle peripheral dim, not "dead"
+        ),
+      )}
+    >
+      {trend.pinned && (
+        <span className="absolute right-1 top-1 text-flare-400 text-2xs font-mono">📌</span>
+      )}
+
+      {/* row 1 — meta. Defensive layout: left cluster shrinks, right
+          cluster never shrinks. Whitespace-nowrap on the left so the
+          source label + time stay on one line; right cluster has the
+          velocity + delta + peak countdown. */}
+      <header className="flex items-center gap-1.5 text-2xs text-ink-200 mb-1 min-w-0">
+        <span className="flex items-center gap-1.5 min-w-0 shrink overflow-hidden whitespace-nowrap">
+          <SourceIcon source={trend.source} />
+          <span className="font-mono uppercase tracking-wide">{sourceLabel(trend.source)}</span>
+          <span className="text-ink-500">·</span>
+          {/* relTime + NEW/UPDATED chips both depend on Date.now() — by the
+              time React hydrates on the client, the wall clock has advanced
+              a few ms and the relative-time string can flip ("14m ago" →
+              "13m ago"), causing a hydration mismatch warning. The drift is
+              cosmetic, so we tell React to leave it alone. */}
+          <span suppressHydrationWarning>{relTime(trend.firstSeenAt)}</span>
+          <span suppressHydrationWarning>
+            {(() => {
+              const created = new Date(trend.createdAt).getTime();
+              const updated = new Date(trend.updatedAt).getTime();
+              const tenMinAgo = Date.now() - 10 * 60 * 1000;
+              if (created > tenMinAgo) return <Chip tone="flare" className="!px-1 !py-0 animate-pulse-slow">NEW</Chip>;
+              if (updated > tenMinAgo) return <Chip tone="info"  className="!px-1 !py-0">↻ UPDATED</Chip>;
+              return null;
+            })()}
+          </span>
+        </span>
+        <span className="ml-auto flex items-center gap-2 shrink-0 whitespace-nowrap">
+          <VelocityIndicator velocity={trend.velocity} />
+          {showDelta && (
+            <Chip tone={delta! > 0 ? 'good' : 'warn'} className="!px-1 !py-0">
+              {delta! > 0 ? '▲' : '▼'} {Math.abs(Math.round(delta! * 100))}%
+            </Chip>
+          )}
+          <span className={cn('font-mono', peak.expired ? 'text-ink-500' : 'text-ink-300')}>⏱ {peak.label}</span>
+        </span>
+      </header>
+
+      {/* row 2 — title (always-visible inline link to original).
+          Falls back to a per-source search URL when trend.url is missing,
+          so the ↗ icon is never absent. */}
+      <h3 className="text-sm font-semibold text-ink-100 leading-snug line-clamp-1 mb-0.5 flex items-center gap-1.5">
+        <span className="truncate">{trend.title}</span>
+        <a
+          href={resolveSourceUrl(trend)}
+          target="_blank"
+          rel="noreferrer noopener"
+          onClick={e => e.stopPropagation()}
+          className="flex-shrink-0 text-flare-400 hover:text-flare-300 text-2xs font-mono tabular-nums"
+          title={trend.url ? `Open on ${sourceLabel(trend.source)} ↗` : `Search ${sourceLabel(trend.source)} ↗ (no canonical URL)`}
+        >↗</a>
+      </h3>
+
+      {/* row 3 — lineage */}
+      <p className="text-xs text-ink-300/70 line-clamp-1 mb-1.5">{trend.lineage}</p>
+
+      {/* row 4 — score chips */}
+      <div className="flex items-center gap-1 mb-1.5">
+        <ScoreChip axis="opp" value={trend.scores.opportunity} />
+        <ScoreChip axis="fit" value={trend.scores.brandFit} />
+        <ScoreChip axis="risk" value={trend.scores.risk} invert />
+        <ScoreChip axis="cringe" value={trend.scores.cringe} invert />
+        <span className="ml-auto"><RecommendationBadge rec={trend.recommendation} /></span>
+      </div>
+
+      {/* row 5 — flags */}
+      {(trend.competitorClaimed || trend.formatFatigue > 0.7 || trend.scores.firstMover >= 0.6) && (
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {trend.competitorClaimed && (
+            <Chip tone="bad" title={`Claimed by ${trend.competitorClaimants.join(', ')}`}>
+              CLAIMED · {trend.competitorClaimants[0]}
+            </Chip>
+          )}
+          {trend.formatFatigue > 0.7 && <Chip tone="warn">FORMAT FATIGUE</Chip>}
+          {trend.scores.firstMover >= 0.6 && !trend.competitorClaimed && (
+            <Chip tone="flare">FIRST-MOVER</Chip>
+          )}
+        </div>
+      )}
+
+      {/* row 6 — actions */}
+      <div className={cn(
+        'flex items-center gap-1 transition-opacity',
+        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+      )}>
+        <Button size="xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
+        <Button size="xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'save'); }}>Save</Button>
+        <Button size="xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'pin'); }}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
+        <a
+          href={resolveSourceUrl(trend)}
+          target="_blank"
+          rel="noreferrer noopener"
+          onClick={e => e.stopPropagation()}
+          className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-2xs font-medium text-ink-200 hover:bg-ink-700"
+          title={trend.url ? 'Open original (O)' : `Search ${sourceLabel(trend.source)} for this (O)`}
+        >
+          {trend.url ? 'Open ↗' : 'Search ↗'}
+        </a>
+        <Button size="xs" variant="ghost" className="ml-auto text-ink-400 hover:text-signal-red"
+          onClick={e => { e.stopPropagation(); onAction(trend.id, 'dismiss'); }}>Dismiss</Button>
+      </div>
+    </article>
+  );
+});
