@@ -13,6 +13,7 @@ interface NavItem {
 
 const ITEMS: NavItem[] = [
   { href: '/settings/brand',        label: 'Brand Profile',  helper: 'Voice, keywords, topics, audience',          glyph: '◆' },
+  { href: '/settings/watchlist',    label: 'Watchlist',       helper: 'Unified brand / competitor / theme / banned', glyph: '◇' },
   { href: '/settings/ai',           label: 'AI Providers',    helper: 'Anthropic / OpenAI / Gemini / OpenRouter',   glyph: '✦' },
   { href: '/settings/scoring',      label: 'Scoring',         helper: 'Weights + projected top-N preview',          glyph: '∿' },
   { href: '/settings/connectors',   label: 'Connectors',      helper: 'X, Reddit, YouTube, News, RSSHub, …',        glyph: '⌬' },
