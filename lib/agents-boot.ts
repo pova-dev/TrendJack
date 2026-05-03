@@ -29,6 +29,7 @@ import { getBrand, persistScoredTrend, getTrend } from './store';
 import { enrichSignal } from './enrichment';
 import { startPushDeliveryWorker } from './push-delivery';
 import { startBattleCardAgent } from '@/src/agents/battlecard';
+import { startCalibrationAgent } from '@/src/agents/calibration';
 import { getOrgCredentials } from './credentials';
 import { prisma } from './db';
 import type { RawSignal, ScoreResult } from '@/src/core/scoring/types';
@@ -78,13 +79,19 @@ export function bootAgents(): AgentRunState {
   startArchitectAgent({
     bus,
     onStuck: () => { stuckMessages++; },
-    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent'],
+    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent', 'calibration-agent'],
   });
 
   // Push-delivery worker — subscribes to STREAMS.alerts and fans out
   // Web Push notifications to PushSubscription rows for the alerted
   // brand. Idle when PUSH_VAPID_* env vars are missing.
   startPushDeliveryWorker();
+
+  // Calibration agent — subscribes to STREAMS.operatorFeedback. Rolls
+  // up Bayesian beta-binomial buckets per (brand × axis × bucket) so
+  // operator save/dismiss patterns nudge `opportunity` ranking
+  // outside the engine. CVS untouched (CLAUDE.md hard-rule 4).
+  startCalibrationAgent({ bus });
 
   // Battle-Card agent — subscribes to STREAMS.lineage. The lineage-cron
   // emits dilutive / competitor-claimed reports each tick; agent

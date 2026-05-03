@@ -42,6 +42,7 @@ export interface FilterAgentDeps {
     hoursSinceCompetitorClaim?: number;
     competitorShareOfVoice?: number;
     brandPostCountForTrend?: number;
+    calibrationProvider?: (signal: RawSignal, partialResult: { scores: { opportunity: number; brandFit: number; risk: number; cringe: number; saturation: number; firstMover: number } }) => number;
   }>;
   /** Optional persist hook. When supplied, Filter Agent writes scored
    *  trends to the DB through this callback. When omitted, the agent

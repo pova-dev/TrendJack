@@ -62,6 +62,12 @@ export interface ScoringContext {
   /** Lineage-Agent-supplied competitor share-of-voice (0..1). Above 0.40,
    *  saturation gains a graduated contribution per Phase 6.5 spec. */
   competitorShareOfVoice?: number;
+  /** Calibration-Engine-supplied multiplier (Feature D Phase 1). Applied
+   *  to `opportunity` AFTER it's computed — never to CVS / jackingScore.
+   *  Returns 1.0 when no operator feedback has been collected for this
+   *  brand yet (cold start). Clamped to [0.5, 1.5] inside the agent.
+   *  When omitted, score() runs unmodified — full backwards compat. */
+  calibrationProvider?: (signal: RawSignal, partialResult: { scores: { opportunity: number; brandFit: number; risk: number; cringe: number; saturation: number; firstMover: number } }) => number;
 }
 
 /**
