@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="86" fill="#0a0a10"/>
+  <rect x="54" y="54" width="404" height="404" rx="54" fill="#FF6A1A"/>
+  <text x="256" y="320" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="230" font-weight="700" fill="#0a0a10">TJ</text>
+</svg>
