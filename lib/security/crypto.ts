@@ -8,7 +8,20 @@
 import crypto from 'crypto';
 import 'server-only';
 
-const SECRET = process.env.SESSION_SECRET || 'dev-only-insecure-secret-please-change-to-32+chars-in-prod';
+// Same hard-fail as lib/auth/session.ts — production must supply a real
+// SESSION_SECRET, dev gets the placeholder.
+function resolveSecret(): string {
+  const env = process.env.SESSION_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!env || env.length < 32)) {
+    throw new Error(
+      'FATAL: SESSION_SECRET must be set to a 32+ char value in production ' +
+      '(used by AES-256-GCM credential encryption). ' +
+      'Generate one with `openssl rand -hex 32`.',
+    );
+  }
+  return env || 'dev-only-insecure-secret-please-change-to-32+chars-in-prod';
+}
+const SECRET = resolveSecret();
 const KEY = crypto.createHash('sha256').update(SECRET).digest(); // 32 bytes
 const IV_LEN = 12;
 
