@@ -29,8 +29,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Push event — wires to STREAMS.alerts via the (TODO) /api/push delivery.
-// The payload shape mirrors the AlertMessage type from src/core/state.
+// Push event — payload shape mirrors AlertPayload in lib/push-delivery.ts,
+// emitted by the push-delivery worker when an AlertMessage hits STREAMS.alerts.
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   let payload = {};

@@ -27,6 +27,7 @@ import { startArchitectAgent } from '@/src/agents/architect';
 import { bootstrapConnectors } from '@/src/connectors';
 import { getBrand, persistScoredTrend } from './store';
 import { enrichSignal } from './enrichment';
+import { startPushDeliveryWorker } from './push-delivery';
 
 interface AgentRunState {
   startedAt: Date;
@@ -73,8 +74,13 @@ export function bootAgents(): AgentRunState {
   startArchitectAgent({
     bus,
     onStuck: () => { stuckMessages++; },
-    monitorGroups: ['filter-agent', 'verifier-agent'],
+    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery'],
   });
+
+  // Push-delivery worker — subscribes to STREAMS.alerts and fans out
+  // Web Push notifications to PushSubscription rows for the alerted
+  // brand. Idle when PUSH_VAPID_* env vars are missing.
+  startPushDeliveryWorker();
 
   const state: AgentRunState = {
     startedAt: new Date(),

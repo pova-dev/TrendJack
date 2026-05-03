@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentContext } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // POST /api/push/subscribe — accept a Web Push subscription from the
-// browser and stash it for later delivery.
+// browser and persist it for later delivery.
 //
-// Phase-12 stub: this endpoint validates and acks the subscription
-// shape but doesn't yet persist it. Persistence + delivery require:
-//   1. A push_subscription table on the brand (one-to-many — one user
-//      can have multiple devices).
-//   2. VAPID keys in env (PUSH_VAPID_PUBLIC, PUSH_VAPID_PRIVATE).
-//   3. A delivery worker that subscribes to STREAMS.alerts and uses
-//      the web-push npm package to fan out to subscriptions.
+// We upsert on `endpoint` because browsers re-issue the same endpoint
+// when the user re-subscribes with the same VAPID key, so a re-install
+// or a permission re-grant doesn't create a stale duplicate row.
 //
-// All three are mechanical follow-ups; the current scaffold lets the
-// browser register a SW + capture a subscription so we can wire
-// delivery without changing the client side.
+// Persistence is per (brand × user × endpoint). The push-delivery
+// worker (lib/push-delivery.ts) subscribes to STREAMS.alerts and fans
+// out AlertMessages to all PushSubscriptions matching the alert's
+// brandId.
 
 interface PushSubscriptionShape {
   endpoint: string;
@@ -27,17 +25,58 @@ interface PushSubscriptionShape {
 
 export async function POST(req: NextRequest) {
   const auth = await getCurrentContext();
-  if (!auth?.brand) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!auth?.user || !auth?.brand) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
 
   const sub = (await req.json().catch(() => null)) as PushSubscriptionShape | null;
   if (!sub || typeof sub.endpoint !== 'string' || !sub.keys?.p256dh || !sub.keys?.auth) {
     return NextResponse.json({ error: 'invalid_subscription' }, { status: 400 });
   }
 
-  // TODO Phase-12: persist to push_subscription table.
-  return NextResponse.json({
-    ok: true,
-    accepted: { endpoint: sub.endpoint.slice(0, 60) + '…' },
-    note: 'Subscription captured. Persistence + VAPID delivery wiring is the next step.',
+  const userAgent = req.headers.get('user-agent')?.slice(0, 200) ?? null;
+  const expiresAt = sub.expirationTime ? new Date(sub.expirationTime) : null;
+
+  // Upsert on endpoint — same device re-subscribing should refresh the
+  // keys + lastSeenAt, not create a duplicate row.
+  const row = await prisma.pushSubscription.upsert({
+    where: { endpoint: sub.endpoint },
+    create: {
+      brandId: auth.brand.id,
+      userId: auth.user.id,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+      userAgent,
+      expiresAt,
+    },
+    update: {
+      brandId: auth.brand.id,
+      userId: auth.user.id,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+      userAgent,
+      expiresAt,
+      lastSeenAt: new Date(),
+      failCount: 0,
+    },
   });
+
+  return NextResponse.json({ ok: true, id: row.id });
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await getCurrentContext();
+  if (!auth?.user) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const endpoint = searchParams.get('endpoint');
+  if (!endpoint) return NextResponse.json({ error: 'missing_endpoint' }, { status: 400 });
+
+  await prisma.pushSubscription.deleteMany({
+    where: { endpoint, userId: auth.user.id },
+  });
+  return NextResponse.json({ ok: true });
 }
