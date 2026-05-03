@@ -120,6 +120,14 @@ export interface BrandProfile {
    *  category fan-out in the Google Trends connector. Empty = top stories
    *  (legacy default). See prisma/schema.prisma comment for the id table. */
   gtrendsCategories?: string[];
+  /** Optional sub-locality slug ('mumbai', 'new-york', etc.) for connectors
+   *  that support city-level drilldown. Lowercase-dashed. */
+  geoSubregion?: string;
+  /** Map of competitorName → Facebook Page ID. Used by the Meta Ad Library
+   *  connector to construct accurate `view_all_page_id` deep-links instead
+   *  of fuzzy keyword search. Operators get the page ID from the
+   *  competitor's FB page transparency section. */
+  competitorPageIds?: Record<string, string>;
   safeThemes: string[];
   competitors: string[];
   priorityPlatforms: SourceId[] | string[];

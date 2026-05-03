@@ -69,8 +69,16 @@ export class XTrendingConnector implements Connector {
   async poll(opts: ConnectorPollOpts): Promise<ConnectorResult> {
     const geo = opts.geo || opts.credentials?.GTRENDS_GEO || process.env.GTRENDS_GEO || 'India';
     const slug = COUNTRY_SLUG[geo.toLowerCase()] ?? COUNTRY_SLUG[geo.toLowerCase().replace(/-/g, ' ')] ?? 'india';
+    // Sub-locality drilldown — trends24 supports paths like /india/mumbai/,
+    // /united-states/new-york/, /united-kingdom/london/. The `geoSubregion`
+    // opt is a lowercase-dashed slug operators set per-brand. When unset
+    // we hit the country-level URL.
+    const subregion = opts.geoSubregion?.trim().toLowerCase().replace(/\s+/g, '-');
+    const url = subregion
+      ? `https://trends24.in/${slug}/${subregion}/`
+      : `https://trends24.in/${slug}/`;
     const country = slug.replace(/-/g, ' ');
-    const url = `https://trends24.in/${slug}/`;
+    const localeLabel = subregion ? `${subregion.replace(/-/g, ' ')}, ${country}` : country;
     const competitorSet = new Set((opts.competitors ?? []).map(c => c.toLowerCase()));
     const keywords = (opts.brandKeywords ?? []).map(k => k.toLowerCase()).filter(Boolean);
 
@@ -114,9 +122,9 @@ export class XTrendingConnector implements Connector {
       signals.push({
         source: 'x',
         title: title.slice(0, 200),
-        summary: `Trending on X in ${country} (rank ${rank})`,
+        summary: `Trending on X in ${localeLabel} (rank ${rank})`,
         hashtags: title.startsWith('#') ? [title] : [`#${title.replace(/\s+/g, '')}`],
-        lineage: `[xtrend:${slug}] X · trends24.in · rank #${rank}`,
+        lineage: `[xtrend:${subregion ? `${slug}-${subregion}` : slug}] X · trends24.in · ${localeLabel} · rank #${rank}`,
         firstSeenAt: new Date(),
         velocity: velocityProxy,
         // Reach: 0 = "we don't know". UI renders '—' instead of a fabricated
@@ -126,7 +134,7 @@ export class XTrendingConnector implements Connector {
         competitorClaimants,
         formatFatigue: 0,
         url: `https://twitter.com/search?q=${m[1]}&src=trend_click`,
-        externalId: `x_trend:${slug}:${hash(title)}`,
+        externalId: `x_trend:${subregion ? `${slug}-${subregion}` : slug}:${hash(title)}`,
       });
       if (!matchKw && (opts.emitAll ?? true) === false && competitorClaimants.length === 0) {
         // Operator opted out of emit-all — only emit brand-relevant.

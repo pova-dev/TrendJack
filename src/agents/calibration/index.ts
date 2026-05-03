@@ -75,6 +75,34 @@ function bucketFor(axis: string, features: OperatorFeedbackMessage['features']):
 
 const TRACKED_AXES = ['fit', 'velocity', 'cringe', 'risk', 'saturation', 'cascadePhase', 'brandKeywordHit', 'recommendation'] as const;
 
+// Per-reason bucket weighting (Feature D Phase 4). When the operator
+// supplies a dismiss reason via the chip modal, we apply the negative
+// polarity ONLY to the axes that match the reason — instead of dragging
+// every axis-bucket uniformly. Targeting the right axis means a brand
+// learns "ignore high-cringe" without also learning "ignore high-fit"
+// just because both were present on the dismissed signal.
+//
+// Reasons that map to a single axis weight that axis at 1.0; any other
+// axes touched by the same event apply a reduced 0.25 weight (still
+// some signal — the operator did dismiss — but most of the blame goes
+// to the named cause). When no reason supplied, all axes weight 1.0.
+const REASON_AXIS_PRIMARY: Record<string, ReadonlyArray<string>> = {
+  off_brand:        ['fit', 'brandKeywordHit'],
+  cringe:           ['cringe'],
+  saturated:        ['saturation'],
+  wrong_audience:   ['fit'],
+  not_now:          ['cascadePhase', 'velocity'],
+  low_fit:          ['fit'],
+};
+const SECONDARY_WEIGHT = 0.25;
+
+function axisWeight(reason: string | undefined, axis: string): number {
+  if (!reason) return 1.0;
+  const primary = REASON_AXIS_PRIMARY[reason];
+  if (!primary) return 1.0;            // unknown reason → uniform
+  return primary.includes(axis) ? 1.0 : SECONDARY_WEIGHT;
+}
+
 /** Cold-boot rebuild — pull every OperatorFeedbackBucket row into the
  *  in-memory cache. Called once per agent boot; tests can re-trigger
  *  via `_resetCalibrationForTesting`. */
@@ -117,9 +145,19 @@ async function applyFeedback(msg: OperatorFeedbackMessage): Promise<void> {
     cache.set(msg.brandId, brand);
   }
 
+  // Per-reason axis weighting (Phase 4) — when a dismiss reason is
+  // supplied, restrict the negative-polarity update to the axes
+  // implicated by the reason. Positive-polarity events ALWAYS apply
+  // uniformly across axes (a save tells us the whole signal worked).
   for (const axis of TRACKED_AXES) {
     const bucket = bucketFor(axis, msg.features);
     if (!bucket) continue;
+    // Reason-aware skip: when polarity < 0 AND axis isn't part of the
+    // reason's primary set, don't drag it. Saves and approves stay
+    // uniform across all axes.
+    if (msg.polarity < 0 && msg.reason && axisWeight(msg.reason, axis) < 0.5) {
+      continue;
+    }
     const k = key(axis, bucket);
     const cur = brand.get(k) ?? { pos: 0, neg: 0 };
     if (msg.polarity > 0) cur.pos++;

@@ -33,6 +33,20 @@ export interface ConnectorPollOpts {
    */
   credentials?: Record<string, string>;
   /**
+   * Sub-locality slug for connectors that support city/region drilldown
+   * (e.g. trends24's `/india/mumbai/` path). Lowercase, dash-separated
+   * to match the underlying URL scheme. Connectors that don't support
+   * sub-localities ignore this field.
+   */
+  geoSubregion?: string;
+  /**
+   * competitorName → Facebook Page ID map. Used by the Meta Ad Library
+   * connector to construct accurate `view_all_page_id` deep-links
+   * instead of keyword search. Empty entries fall back to keyword
+   * search with a "search-fallback" tag in the lineage.
+   */
+  competitorPageIds?: Record<string, string>;
+  /**
    * Google Trends category filter. When supplied, the GoogleTrendsConnector
    * fans out one fetch per category and tags each emitted signal with its
    * category in the lineage string (`[cat:<id>]`). Other connectors ignore

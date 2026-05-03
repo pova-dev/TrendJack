@@ -79,6 +79,8 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
       credentials,
       gtrendsCategories,
       geo,
+      geoSubregion: brand.geoSubregion,
+      competitorPageIds: brand.competitorPageIds,
     },
     {
       connectors: [
