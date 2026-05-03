@@ -45,6 +45,18 @@ interface Props {
 
 type TabKey = 'overview' | 'scores' | 'drafts' | 'lineage' | 'research';
 
+interface VerifiedClaimRender {
+  id: string;
+  key: string;
+  value: string;
+  sourceUrl: string;
+  quotedSpan: string;
+  confidence: number;
+}
+interface UnverifiedClaimRender {
+  key: string;
+  reason: string;
+}
 interface ResearchPayload {
   cached?: boolean;
   query?: string;
@@ -55,6 +67,13 @@ interface ResearchPayload {
   searchBackend?: string;
   generatedAt?: string;
   aiSummarized?: boolean;
+  // Phase-6 Verifier output: every claim has a sourceUrl + quotedSpan +
+  // confidence. Drafts can ONLY cite from this list — anything in
+  // unverifiedClaims is forbidden.
+  verifiedClaims?: VerifiedClaimRender[];
+  unverifiedClaims?: UnverifiedClaimRender[];
+  verifierProvider?: string;
+  verifierModel?: string;
 }
 
 export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
@@ -633,6 +652,68 @@ function ResearchPanel({ research, loading, onRun, compact }: {
         </span>
       </div>
       <p className="text-ink-100 text-xs leading-relaxed">{research.summary}</p>
+
+      {/* Verified claims — each has a citation. Drafts can ONLY cite
+          from this list. Confidence-coded: ≥0.7 green, 0.4-0.7 amber,
+          <0.4 demoted to unverifiedClaims. */}
+      {!!research.verifiedClaims?.length && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-2xs uppercase tracking-wider text-ink-300">Verified Claims</span>
+            <Chip tone="good">{research.verifiedClaims.length}</Chip>
+            {research.verifierProvider && (
+              <span className="text-2xs font-mono text-ink-400">via {research.verifierProvider}</span>
+            )}
+          </div>
+          <ul className="space-y-1.5">
+            {research.verifiedClaims.map(c => {
+              const conf = Math.round(c.confidence * 100);
+              const tone = c.confidence >= 0.7 ? 'good' : c.confidence >= 0.4 ? 'warn' : 'bad';
+              let host = c.sourceUrl;
+              try { host = new URL(c.sourceUrl).hostname; } catch { /* keep raw */ }
+              return (
+                <li key={c.id} className="rounded-md bg-ink-900 border border-ink-700 px-2.5 py-1.5">
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className="text-2xs uppercase font-mono tracking-wider text-ink-300 flex-shrink-0">{c.key}</span>
+                    <span className="text-ink-100 text-xs flex-1">{c.value}</span>
+                    <Chip tone={tone}>{conf}%</Chip>
+                  </div>
+                  <p className="text-2xs text-ink-300 italic mt-1">"{c.quotedSpan}"</p>
+                  <a
+                    href={c.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-2xs text-flare-400 hover:underline font-mono"
+                  >
+                    ↗ {host}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Unverified claims — facts the model couldn't cite. Drafts MUST
+          NOT use these. Surfaced for transparency so the operator
+          knows what's missing. */}
+      {!!research.unverifiedClaims?.length && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-2xs uppercase tracking-wider text-ink-400">Unverified · drafts can't use</span>
+            <Chip tone="warn">{research.unverifiedClaims.length}</Chip>
+          </div>
+          <ul className="space-y-1">
+            {research.unverifiedClaims.map((c, i) => (
+              <li key={i} className="text-2xs text-ink-400 px-2.5 py-1 rounded bg-ink-800/40 border border-ink-700/40">
+                <span className="font-mono uppercase tracking-wider mr-2">{c.key}</span>
+                <span className="italic">{c.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {!!research.keyFacts?.length && (
         <dl className="grid grid-cols-1 gap-1">
           {research.keyFacts.map((f, i) => (

@@ -4,6 +4,9 @@ import { getCurrentContext } from '@/lib/auth';
 import { researchTrend } from '@/lib/research';
 import { prisma } from '@/lib/db';
 import { getOrgCredentials } from '@/lib/credentials';
+import { makeLlmVerifier } from '@/src/agents/verifier';
+import { aiHealth } from '@/lib/ai/provider';
+import type { RawSignal } from '@/src/core/scoring/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,16 +18,55 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const trend = await getTrend(id);
   if (!trend || trend.brandId !== auth.brand.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
-  // Optional preferred backend: 'auto' (default — free first, paid last),
-  // 'sonar' (force Perplexity Sonar via OpenRouter), 'tavily', 'brave',
-  // 'searx', 'duckduckgo'.
   const body = await req.json().catch(() => ({})) as { backend?: string };
   const creds = await getOrgCredentials(auth.org.id);
-  // The backend hint is passed as a synthetic credential the adapter reads.
   const credsWithHint = body.backend ? { ...creds, TJ_RESEARCH_BACKEND: body.backend } : creds;
-  const result = await researchTrend(trend, credsWithHint);
-  await prisma.trend.update({ where: { id }, data: { researchCache: JSON.stringify(result) } });
-  return NextResponse.json(result);
+
+  // Run legacy research (summary + sources) AND the premium-AI Verifier
+  // (per-claim citations) in parallel. The Verifier only fires when
+  // operator credentials are configured — falls through gracefully
+  // otherwise.
+  const health = aiHealth(creds);
+  const aiReady = health.anthropic || health.openai || health.google || health.openrouter;
+
+  const trendAsSignal: RawSignal = {
+    source: trend.source,
+    title: trend.title,
+    summary: trend.summary,
+    hashtags: trend.hashtags,
+    text: undefined,
+    lineage: trend.lineage,
+    catalyst: trend.catalyst,
+    firstSeenAt: new Date(trend.firstSeenAt),
+    velocity: trend.velocity,
+    reach: Number(trend.reach),
+    sentiment: trend.sentiment,
+    competitorClaimants: trend.competitorClaimants,
+    formatFatigue: trend.formatFatigue ?? 0,
+    examples: trend.examples,
+    url: trend.url,
+    externalId: trend.sourceRef,
+  };
+
+  const [research, verification] = await Promise.all([
+    researchTrend(trend, credsWithHint),
+    aiReady
+      ? makeLlmVerifier({ credentials: creds }).verify({ signal: trendAsSignal, brandId: auth.brand.id })
+      : Promise.resolve(null),
+  ]);
+
+  // Merge verifier output into the research payload so the dashboard
+  // can render per-claim citations alongside the summary blob.
+  const merged = {
+    ...research,
+    verifiedClaims: verification?.claims ?? [],
+    unverifiedClaims: verification?.unverifiedClaims ?? [],
+    verifierProvider: verification?.provider,
+    verifierModel: verification?.model,
+  };
+
+  await prisma.trend.update({ where: { id }, data: { researchCache: JSON.stringify(merged) } });
+  return NextResponse.json(merged);
 }
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
