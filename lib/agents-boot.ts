@@ -30,6 +30,7 @@ import { enrichSignal } from './enrichment';
 import { startPushDeliveryWorker } from './push-delivery';
 import { startBattleCardAgent } from '@/src/agents/battlecard';
 import { startCalibrationAgent } from '@/src/agents/calibration';
+import { startShipItComposer } from '@/src/agents/composer';
 import { getOrgCredentials } from './credentials';
 import { prisma } from './db';
 import type { RawSignal, ScoreResult } from '@/src/core/scoring/types';
@@ -79,7 +80,7 @@ export function bootAgents(): AgentRunState {
   startArchitectAgent({
     bus,
     onStuck: () => { stuckMessages++; },
-    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent', 'calibration-agent'],
+    monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent', 'calibration-agent', 'composer-agent'],
   });
 
   // Push-delivery worker — subscribes to STREAMS.alerts and fans out
@@ -92,6 +93,12 @@ export function bootAgents(): AgentRunState {
   // operator save/dismiss patterns nudge `opportunity` ranking
   // outside the engine. CVS untouched (CLAUDE.md hard-rule 4).
   startCalibrationAgent({ bus });
+
+  // Ship-It Plan composer — subscribes to STREAMS.scoredTrends.
+  // Composes autonomous strategy plans when POST_NOW + high CVS +
+  // fast-growing-initial cascade phase + active battle-card all hold.
+  // Premium-AI-tier; budget-gated via runChat. 6h debounce per trend.
+  startShipItComposer({ bus });
 
   // Battle-Card agent — subscribes to STREAMS.lineage. The lineage-cron
   // emits dilutive / competitor-claimed reports each tick; agent

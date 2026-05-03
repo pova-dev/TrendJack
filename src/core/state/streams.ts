@@ -113,6 +113,38 @@ export interface CringeDecayMessage {
   hasPeaked: boolean;
 }
 
+/** Emitted when a TrendRoom decides on an angle (Feature E). The
+ *  decision finalizer publishes after the room reaches quorum / is
+ *  manually decided. The agent that subscribes also publishes a
+ *  synthetic OperatorFeedbackMessage so the calibration engine learns
+ *  from collective decisions. */
+export interface RoomDecisionMessage {
+  roomId: string;
+  trendId: string;
+  brandId: string;
+  orgId: string;
+  decidedBy: string;            // userId
+  chosenAngleId: string;        // BattleCard angle id or Draft variant id
+  rationale?: string;
+  voteSummary: { angleId: string; weight: number; voters: number }[];
+  decidedAt: Date;
+}
+
+/** Emitted by ShipItComposer (Feature F) when an autonomous plan is
+ *  composed for an operator to approve. */
+export interface ShipItPlanMessage {
+  planId: string;
+  trendId: string;
+  brandId: string;
+  orgId: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'shipped' | 'expired' | 'superseded';
+  chosenAngleRef: string;       // "<battleCardId>:<angleIndex>"
+  draftVariantId?: string;
+  proposedScheduleAt: Date;
+  expiresAt: Date;
+  emittedAt: Date;
+}
+
 /** Emitted by lib/store.recordAction whenever an operator acts on a trend.
  *  Drives the Calibration Engine (Feature D) — each event is a labeled
  *  training pair (signal feature snapshot + operator decision polarity)
@@ -176,6 +208,8 @@ export const STREAMS = {
   cringeDecay:     { name: 'tj.trends.cringe-decay' } as StreamId<CringeDecayMessage>,
   alerts:          { name: 'tj.alerts'           } as StreamId<AlertMessage>,
   operatorFeedback:{ name: 'tj.operator.feedback'} as StreamId<OperatorFeedbackMessage>,
+  roomDecisions:   { name: 'tj.room.decisions'   } as StreamId<RoomDecisionMessage>,
+  shipItPlans:     { name: 'tj.shipit.plans'     } as StreamId<ShipItPlanMessage>,
 } as const;
 
 export type StreamName = (typeof STREAMS)[keyof typeof STREAMS]['name'];
