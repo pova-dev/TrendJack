@@ -13,6 +13,7 @@ import { formatBig, relTime, timeUntil, pct } from '@/lib/utils';
 import { resolveSourceUrl } from '@/lib/source-link';
 import { Sparkline } from '@/components/trend/Sparkline';
 import { cn } from '@/lib/utils';
+import { displayLineage } from '@/lib/lineage-display';
 
 // Static display data for the Hook Library + Templates picker. Mirrors
 // what's in src/agents/creative/hooks.ts and templates.ts but inlined
@@ -264,7 +265,7 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
   return (
     <>
       <Section title="Why now">
-        <p className="text-ink-100">{trend.lineage}</p>
+        <p className="text-ink-100">{displayLineage(trend.lineage)}</p>
         {trend.catalyst && <p className="mt-1 text-ink-300">Catalyst: <span className="text-ink-100">{trend.catalyst}</span></p>}
       </Section>
 
@@ -767,7 +768,7 @@ function LineageTab({ trend, probe, loading, onProbe }: { trend: Trend; probe: u
   return (
     <div className="space-y-4">
       <Section title="Surface lineage (from connector)">
-        <p className="text-ink-100">{trend.lineage}</p>
+        <p className="text-ink-100">{displayLineage(trend.lineage)}</p>
         {trend.catalyst && <p className="mt-1 text-ink-300">Catalyst: <span className="text-ink-100">{trend.catalyst}</span></p>}
         <div className="mt-2 flex items-center gap-2 text-2xs">
           <Chip>{trend.source}</Chip>

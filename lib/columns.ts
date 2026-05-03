@@ -76,6 +76,13 @@ function specificityScore(filters: ColumnFilters): number {
   if (filters.competitorClaimed === true)        score -= 60;
   if (filters.firstMoverOnly)                    score -= 50;
   if (filters.pinnedOnly)                        score -= 40;
+  // Google Trends category filter is a strong narrowing — without this
+  // bump, a "Trending Now (top stories)" column ties or loses to a
+  // generic "any gtrends source" column and ends up empty because the
+  // generic column claims its items first. -30 puts it above minOpp/
+  // minVelocity but below the source-only filter, so the more specific
+  // category column always wins its slice.
+  if (filters.gtrendsCategory)                   score -= 30;
   if (typeof filters.minReach === 'number')      score -= 15;
   if (typeof filters.minVelocity === 'number')   score -= 15;
   if (typeof filters.minOpportunity === 'number') score -= 10;
