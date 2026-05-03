@@ -90,13 +90,47 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
   const [history, setHistory] = React.useState<{ samples: { t: string; velocity: number; reach: number; opportunity: number }[] } | null>(null);
   const [historyRange, setHistoryRange] = React.useState<'24h' | '7d' | '30d'>('7d');
 
+  // Real Google Trends interest-over-time curve (gtrends source only).
+  // Replaces the velocity-sample sparkline for gtrends trends — those
+  // velocity samples are TrendJack's own readings starting at 0 the
+  // moment we first saw the trend, which is misleading for items that
+  // peaked hours before we ingested them.
+  const [iot, setIot] = React.useState<{ points: { time: number; label: string; value: number }[]; peak: number } | null>(null);
+  const [iotErr, setIotErr] = React.useState<string | null>(null);
+  const [iotLoading, setIotLoading] = React.useState(false);
+
   // Deep lineage probe
   const [lineage, setLineage] = React.useState<unknown | null>(null);
   const [probingLineage, setProbingLineage] = React.useState(false);
 
   React.useEffect(() => {
     setTab('overview'); setDrafts(null); setResearch(null); setHistory(null); setLineage(null);
+    setIot(null); setIotErr(null);
   }, [trend?.id]);
+
+  // Real Google Trends interest-over-time fetch — gtrends trends only.
+  // Maps the drawer's range chip to Google's time-range tokens.
+  React.useEffect(() => {
+    if (!trend || trend.source !== 'google_trends') { setIot(null); return; }
+    const range = historyRange === '24h' ? 'now 1-d' : historyRange === '7d' ? 'now 7-d' : 'today 1-m';
+    let cancelled = false;
+    setIotLoading(true);
+    setIotErr(null);
+    fetch(`/api/trends/${trend.id}/interest-over-time?range=${encodeURIComponent(range)}`)
+      .then(async r => {
+        const j = await r.json().catch(() => null);
+        if (cancelled) return;
+        if (!r.ok) {
+          setIotErr(j?.message || j?.error || `http_${r.status}`);
+          setIot(null);
+        } else if (j?.points) {
+          setIot({ points: j.points, peak: j.peak ?? 0 });
+        }
+      })
+      .catch(e => { if (!cancelled) setIotErr((e as Error).message); })
+      .finally(() => { if (!cancelled) setIotLoading(false); });
+    return () => { cancelled = true; };
+  }, [trend?.id, trend?.source, historyRange]);
 
   // Lazy-load cached lineage when a trend is opened.
   React.useEffect(() => {
@@ -218,6 +252,9 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
               history={history}
               historyRange={historyRange}
               setHistoryRange={setHistoryRange}
+              iot={iot}
+              iotLoading={iotLoading}
+              iotErr={iotErr}
             />
           )}
           {tab === 'scores'   && <ScoresTab trend={trend} />}
@@ -253,7 +290,7 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
 
 // -----------------------------------------------------------------------------
 
-function OverviewTab({ trend, research, researching, onResearch, history, historyRange, setHistoryRange }: {
+function OverviewTab({ trend, research, researching, onResearch, history, historyRange, setHistoryRange, iot, iotLoading, iotErr }: {
   trend: Trend;
   research: ResearchPayload | null;
   researching: boolean;
@@ -261,7 +298,11 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
   history: { samples: { t: string; velocity: number; reach: number; opportunity: number }[] } | null;
   historyRange: '24h' | '7d' | '30d';
   setHistoryRange: (r: '24h' | '7d' | '30d') => void;
+  iot: { points: { time: number; label: string; value: number }[]; peak: number } | null;
+  iotLoading: boolean;
+  iotErr: string | null;
 }) {
+  const showIot = trend.source === 'google_trends';
   return (
     <>
       <Section title="Why now">
@@ -283,11 +324,45 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
           </span>
         </span>
       }>
-        <Sparkline samples={history?.samples ?? []} metric="velocity" height={56} />
-        <p className="text-2xs text-ink-400 mt-1">
-          Velocity samples over the {historyRange === '24h' ? 'last 24 hours' : historyRange === '7d' ? 'last 7 days' : 'last 30 days'}.
-          Each refresh appends a sample, so this builds up automatically.
-        </p>
+        {showIot ? (
+          iot && iot.points.length > 0 ? (
+            <>
+              <Sparkline
+                samples={iot.points.map(p => ({
+                  t: new Date(p.time * 1000).toISOString(),
+                  velocity: p.value,
+                  reach: 0,
+                  opportunity: 0,
+                }))}
+                metric="velocity"
+                height={56}
+              />
+              <p className="text-2xs text-ink-400 mt-1">
+                Real Google Trends interest, 0–100 normalised within this window
+                (peak {iot.peak}). Source: trends.google.com.
+              </p>
+            </>
+          ) : iotLoading ? (
+            <p className="text-2xs text-ink-400 italic">Loading Google Trends curve…</p>
+          ) : iotErr === 'rate_limited' ? (
+            <p className="text-2xs text-ink-400">
+              Google Trends rate-limited this IP. Try again in a few minutes — the
+              series caches for 1h once it loads.
+            </p>
+          ) : iotErr ? (
+            <p className="text-2xs text-ink-400">Couldn&apos;t load curve: {iotErr}.</p>
+          ) : (
+            <p className="text-2xs text-ink-400 italic">No interest data yet.</p>
+          )
+        ) : (
+          <>
+            <Sparkline samples={history?.samples ?? []} metric="velocity" height={56} />
+            <p className="text-2xs text-ink-400 mt-1">
+              Velocity samples over the {historyRange === '24h' ? 'last 24 hours' : historyRange === '7d' ? 'last 7 days' : 'last 30 days'}.
+              Each refresh appends a sample, so this builds up automatically.
+            </p>
+          </>
+        )}
       </Section>
 
       <Section title="Recommendation"><p>{trend.recommendationReason}</p></Section>
