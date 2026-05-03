@@ -75,10 +75,13 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
         fromConnector(new GoogleTrendsConnector()),
       ],
       perPollTimeoutMs: 15_000,
-      // Don't publish to STREAMS.rawSignals yet — the Filter Agent that
-      // would consume it lands in Phase 4. Until then we score+persist
-      // synchronously here. Keeps behavior identical for the dashboard.
-      dryRun: true,
+      // Phase 4.1 wired: Scout now publishes to STREAMS.rawSignals so
+      // the Filter Agent (lib/agents-boot.ts) receives them. The
+      // synchronous score+persist below still runs in parallel — it
+      // owns the DB writes that drive the dashboard. Once we've
+      // verified the agent path produces equivalent output, the inline
+      // loop will be removed in favor of a Filter-Agent-driven persist.
+      dryRun: false,
     },
   );
 

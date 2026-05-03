@@ -23,6 +23,7 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_API_PREFIXES = [
   '/api/health',
+  '/api/agents/health',
   '/api/devlog',
   '/api/cron-tick',
   '/api/cron/poll',
