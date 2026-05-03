@@ -444,6 +444,13 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
       )}
 
       <Section title="Recommendation"><p>{trend.recommendationReason}</p></Section>
+
+      {/* Outcomes — closes the prediction → ship → measure loop. Visible
+          on every trend; operator can update at any time. The reported
+          performanceMultiple feeds calibration as a high-fidelity
+          training signal (positive when >1.2, negative when <0.8). */}
+      <OutcomesSection trend={trend} />
+
       {/* Score snapshot intentionally NOT rendered here. The TrendCard
           already shows OPP/FIT/RISK/CRINGE at scan-level; the dedicated
           Scores tab below shows the full 8-axis breakdown with
@@ -477,6 +484,150 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
           Visual Auditor). */}
       <ResearchSummaryStrip research={research} loading={researching} />
     </>
+  );
+}
+
+// ─── Outcomes section (Performance Loopback) ──────────────────────────────
+//
+// Operator-reported actual-vs-expected performance after they shipped.
+// Editable inline; submit POSTs to /api/trends/[id]/outcome which
+// publishes to STREAMS.operatorFeedback with polarity weighted by
+// performanceMultiple (closes the train loop with REAL outcomes vs
+// just the lighter save/dismiss signal).
+function OutcomesSection({ trend }: { trend: Trend }) {
+  const [editing, setEditing] = React.useState(false);
+  const [perf, setPerf] = React.useState<string>(
+    typeof trend.performanceMultiple === 'number' ? String(trend.performanceMultiple) : '',
+  );
+  const [eng, setEng] = React.useState<string>(
+    typeof trend.postEngagement === 'number' ? String(trend.postEngagement) : '',
+  );
+  const [saving, setSaving] = React.useState(false);
+  const [savedPerf, setSavedPerf] = React.useState<number | undefined>(trend.performanceMultiple);
+  const [savedEng, setSavedEng] = React.useState<number | undefined>(trend.postEngagement);
+
+  async function submit() {
+    setSaving(true);
+    try {
+      const body: Record<string, number> = {};
+      const perfNum = parseFloat(perf);
+      const engNum = parseInt(eng, 10);
+      if (Number.isFinite(perfNum)) body.performanceMultiple = perfNum;
+      if (Number.isFinite(engNum)) body.postEngagement = engNum;
+      const r = await fetch(`/api/trends/${trend.id}/outcome`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        setSavedPerf(j.performanceMultiple ?? undefined);
+        setSavedEng(j.postEngagement ?? undefined);
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Don't render the section by default for trends that aren't acted-on
+  // yet — keeps Overview tight. Show only when there's data OR the
+  // operator clicks "Report outcome" from the drawer footer.
+  const hasData = savedPerf != null || savedEng != null;
+  if (!hasData && !editing) {
+    return (
+      <Section title="Outcomes">
+        <p className="text-2xs text-ink-400">
+          No outcome reported yet.{' '}
+          <button
+            onClick={() => setEditing(true)}
+            className="text-flare-400 hover:text-flare-300 underline-offset-2 hover:underline"
+          >
+            Report outcome →
+          </button>
+        </p>
+      </Section>
+    );
+  }
+
+  if (editing) {
+    return (
+      <Section title="Outcomes — report">
+        <p className="text-2xs text-ink-300 mb-2">
+          What actually happened after you shipped? Drives high-fidelity
+          calibration training.
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <label className="block">
+            <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">vs expected</span>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={perf}
+              onChange={e => setPerf(e.target.value)}
+              placeholder="1.0 = met, 2.0 = doubled"
+              className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+            />
+          </label>
+          <label className="block">
+            <span className="text-2xs font-mono uppercase tracking-wider text-ink-300">total engagement</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={eng}
+              onChange={e => setEng(e.target.value)}
+              placeholder="likes + reposts + replies"
+              className="mt-1 block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+            />
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={submit} disabled={saving}>
+            {saving ? '… saving' : 'Save outcome'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+      </Section>
+    );
+  }
+
+  // Display
+  const perfTone =
+    typeof savedPerf === 'number' && savedPerf >= 1.2 ? 'good' :
+    typeof savedPerf === 'number' && savedPerf < 0.8 ? 'bad' :
+    'neutral';
+  return (
+    <Section title="Outcomes">
+      <div className="flex items-center gap-2 flex-wrap">
+        {savedPerf != null && (
+          <Chip tone={perfTone} className="text-2xs">
+            <span className="font-mono">{savedPerf.toFixed(2)}×</span> vs expected
+          </Chip>
+        )}
+        {savedEng != null && savedEng > 0 && (
+          <Chip tone="info" className="text-2xs">
+            <span className="font-mono">{savedEng.toLocaleString()}</span> engagement
+          </Chip>
+        )}
+        <button
+          onClick={() => setEditing(true)}
+          className="ml-auto text-2xs text-flare-400 hover:text-flare-300 underline-offset-2 hover:underline"
+        >
+          edit
+        </button>
+      </div>
+      {savedPerf != null && (savedPerf >= 1.2 || savedPerf < 0.8) && (
+        <p className="mt-1 text-2xs text-ink-400 italic">
+          {savedPerf >= 1.2
+            ? '↑ Strong result — calibration learns to surface similar trends.'
+            : '↓ Underperformed — calibration learns to deprioritise similar trends.'}
+        </p>
+      )}
+    </Section>
   );
 }
 

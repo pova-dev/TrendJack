@@ -187,6 +187,13 @@ export interface Trend {
    *  (Feature D). 1.0 means no nudge yet. UI threshold for the
    *  ↑/↓ glyph is `Math.abs(boost - 1) > 0.05`. */
   calibrationBoost?: number;
+  /** Operator-reported post-ship engagement count (likes + reposts +
+   *  comments). Closes the prediction → ship → measure loop. */
+  postEngagement?: number;
+  /** Operator-reported actual-vs-expected performance ratio. 1.0 = met
+   *  expectations; 2.0 = doubled them; 0.5 = half. Drives high-fidelity
+   *  calibration training signal. */
+  performanceMultiple?: number;
   velocity: number;       // posts/hour or %change
   reach: number;
   sentiment: number;      // -1..1

@@ -5,6 +5,7 @@ import { TopBar } from '@/components/shell/TopBar';
 import { BrandEditor } from '@/components/brand/BrandEditor';
 import { GeoVisibility } from '@/components/brand/GeoVisibility';
 import { CalibrationPanel } from '@/components/brand/CalibrationPanel';
+import { VoiceLinter } from '@/components/brand/VoiceLinter';
 
 export default async function BrandPage() {
   const ctx = await requireBrand();
@@ -27,6 +28,7 @@ export default async function BrandPage() {
         </header>
         <BrandEditor initial={brand} />
         <div className="mt-5 space-y-5">
+          <VoiceLinter />
           <GeoVisibility />
           <CalibrationPanel />
         </div>
