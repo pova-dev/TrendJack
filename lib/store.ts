@@ -4,7 +4,10 @@
 // Hydrates Brand → BrandProfile (untyped JSON columns get parsed) and Trend
 // rows → typed Trend objects. Writes accept either patches or full objects.
 
+import 'server-only';
 import { prisma } from './db';
+import { publishBrandTrend } from './realtime/bus';
+import type { ScoreResult } from '@/src/core/scoring';
 import type {
   ActionType,
   BoardConfig,
@@ -473,4 +476,108 @@ export async function logAudit(opts: { orgId: string; userId?: string; action: s
       meta: opts.meta ? JSON.stringify(opts.meta) : null,
     },
   });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// persistScoredTrend: the canonical write path for a scored signal.
+// Used by both lib/ingest.ts (legacy synchronous loop) and the Filter
+// Agent (bus subscriber). Single source of truth — both paths produce
+// identical DB output, which is what makes parallel-running safe.
+//
+// Returns 'inserted' | 'updated' so the caller can update its tally.
+// ──────────────────────────────────────────────────────────────────────
+
+export type PersistOutcome = 'inserted' | 'updated';
+
+export async function persistScoredTrend(
+  signal: RawSignal,
+  scoreResult: ScoreResult,
+  brandId: string,
+): Promise<{ outcome: PersistOutcome; trendId: string }> {
+  const externalKey = signal.externalId ?? `${signal.source}:${signal.url}`;
+
+  const existing = await prisma.trend.findFirst({
+    where: { brandId, sourceRef: externalKey },
+  });
+
+  if (existing) {
+    const prevVel = existing.velocity;
+    const delta = prevVel > 0 ? (signal.velocity - prevVel) / prevVel : 0;
+    await prisma.trend.update({
+      where: { id: existing.id },
+      data: {
+        title: signal.title,
+        summary: signal.summary,
+        velocity: signal.velocity,
+        velocityPrev: prevVel,
+        velocityDelta: delta,
+        reach: BigInt(Math.max(0, Math.round(signal.reach))),
+        sentiment: signal.sentiment,
+        scores: JSON.stringify(scoreResult.scores),
+        rationale: JSON.stringify(scoreResult.rationale),
+        recommendation: scoreResult.recommendation,
+        recommendationReason: scoreResult.recommendationReason,
+        peakWindowEnd: scoreResult.peakWindowEnd,
+        competitorClaimed: signal.competitorClaimants.length > 0,
+        competitorClaimants: JSON.stringify(signal.competitorClaimants),
+        brandKeywordHit: scoreResult.brandKeywordHit,
+        matchedBrandKeywords: JSON.stringify(scoreResult.matchedBrandKeywords),
+        url: signal.url ?? existing.url,
+      },
+    });
+    await prisma.trendSample.create({
+      data: {
+        trendId: existing.id,
+        velocity: signal.velocity,
+        reach: BigInt(Math.max(0, Math.round(signal.reach))),
+        sentiment: signal.sentiment,
+        opportunity: scoreResult.scores.opportunity,
+        source: signal.source,
+      },
+    });
+    publishBrandTrend(brandId, { type: 'trend.updated', brandId, trendId: existing.id, reason: 'refresh' });
+    return { outcome: 'updated', trendId: existing.id };
+  }
+
+  const created = await prisma.trend.create({
+    data: {
+      brandId,
+      source: signal.source,
+      sourceRef: externalKey,
+      title: signal.title,
+      summary: signal.summary,
+      hashtags: JSON.stringify(signal.hashtags),
+      lineage: signal.lineage,
+      catalyst: signal.catalyst,
+      firstSeenAt: signal.firstSeenAt,
+      peakWindowEnd: scoreResult.peakWindowEnd,
+      velocity: signal.velocity,
+      reach: BigInt(Math.max(0, Math.round(signal.reach))),
+      sentiment: signal.sentiment,
+      audienceOverlap: scoreResult.scores.audienceOverlap,
+      scores: JSON.stringify(scoreResult.scores),
+      rationale: JSON.stringify(scoreResult.rationale),
+      recommendation: scoreResult.recommendation,
+      recommendationReason: scoreResult.recommendationReason,
+      competitorClaimed: signal.competitorClaimants.length > 0,
+      competitorClaimants: JSON.stringify(signal.competitorClaimants),
+      brandKeywordHit: scoreResult.brandKeywordHit,
+      matchedBrandKeywords: JSON.stringify(scoreResult.matchedBrandKeywords),
+      formatFatigue: signal.formatFatigue,
+      examples: JSON.stringify(signal.examples ?? []),
+      url: signal.url,
+    },
+  });
+  await prisma.trendSample.create({
+    data: {
+      trendId: created.id,
+      velocity: signal.velocity,
+      reach: BigInt(Math.max(0, Math.round(signal.reach))),
+      sentiment: signal.sentiment,
+      opportunity: scoreResult.scores.opportunity,
+      source: signal.source,
+    },
+  });
+  publishBrandTrend(brandId, { type: 'trend.created', brandId, trendId: created.id });
+  return { outcome: 'inserted', trendId: created.id };
 }

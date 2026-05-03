@@ -18,6 +18,7 @@ import { STREAMS } from '@/src/core/state';
 import type { VerifierAdapter, VerificationResult } from './types';
 export type { VerifierAdapter, VerifiedClaim, UnverifiedClaim, VerificationResult } from './types';
 export { stubVerifier } from './stub';
+export { makeLlmVerifier } from './llm';
 
 export interface VerifierAgentDeps {
   bus: StateBus;

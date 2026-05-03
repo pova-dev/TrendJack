@@ -21,10 +21,11 @@
 import 'server-only';
 import { getBus } from '@/src/core/state';
 import { startFilterAgent } from '@/src/agents/filter';
-import { startVerifierAgent, stubVerifier } from '@/src/agents/verifier';
+import { startVerifierAgent, stubVerifier, makeLlmVerifier } from '@/src/agents/verifier';
+import { aiHealth } from '@/lib/ai/provider';
 import { startArchitectAgent } from '@/src/agents/architect';
 import { bootstrapConnectors } from '@/src/connectors';
-import { getBrand } from './store';
+import { getBrand, persistScoredTrend } from './store';
 import { enrichSignal } from './enrichment';
 
 interface AgentRunState {
@@ -52,11 +53,20 @@ export function bootAgents(): AgentRunState {
     bus,
     loadBrand: async (brandId) => getBrand(brandId),
     enrichSignal: async (signal, brandId) => enrichSignal(signal, brandId),
+    persistTrend: async (signal, scoreResult, brandId) => {
+      await persistScoredTrend(signal, scoreResult, brandId);
+    },
   });
 
+  // Pick the LLM-backed Verifier when env-level credentials exist;
+  // org-level credentials override per-call inside the adapter. If
+  // nothing is configured we fall through to the stub (echoes title +
+  // URL only — no fabrication, no premium-AI calls).
+  const health = aiHealth({});
+  const aiReady = health.anthropic || health.openai || health.google || health.openrouter;
   startVerifierAgent({
     bus,
-    adapter: stubVerifier,
+    adapter: aiReady ? makeLlmVerifier() : stubVerifier,
   });
 
   let stuckMessages = 0;

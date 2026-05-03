@@ -40,8 +40,18 @@ export interface FilterAgentDeps {
     reproductionRate?: number;
     crossSourceCount?: number;
     hoursSinceCompetitorClaim?: number;
+    competitorShareOfVoice?: number;
     brandPostCountForTrend?: number;
   }>;
+  /** Optional persist hook. When supplied, Filter Agent writes scored
+   *  trends to the DB through this callback. When omitted, the agent
+   *  just publishes to STREAMS.scoredTrends and a separate persister
+   *  is expected to subscribe. */
+  persistTrend?: (
+    signal: RawSignal,
+    scoreResult: import('@/src/core/scoring').ScoreResult,
+    brandId: string,
+  ) => Promise<void>;
   /** Consumer group name on the bus. Defaults to 'filter-agent'. */
   consumerGroup?: string;
 }
@@ -76,6 +86,13 @@ export function startFilterAgent(deps: FilterAgentDeps): FilterAgentHandle {
           brand,
           ...enrichment,
         });
+
+        // Persist via the injected hook (lib/store.persistScoredTrend
+        // when wired by lib/agents-boot). Skip silently if no persister
+        // is provided — useful for telemetry-only test wiring.
+        if (deps.persistTrend) {
+          await deps.persistTrend(body.signal, scoreResult, body.brandId);
+        }
 
         await deps.bus.publish(STREAMS.scoredTrends, {
           signal: body.signal,

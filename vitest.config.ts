@@ -16,6 +16,9 @@ export default defineConfig({
       '@core':     path.resolve(__dirname, 'src/core'),
       '@agents':   path.resolve(__dirname, 'src/agents'),
       '@connectors': path.resolve(__dirname, 'src/connectors'),
+      // Next.js's server-only module is a runtime guard. In vitest we
+      // don't run inside Next, so stub it as a no-op.
+      'server-only': path.resolve(__dirname, 'tests/stubs/server-only.ts'),
     },
   },
   test: {

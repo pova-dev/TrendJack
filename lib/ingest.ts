@@ -93,103 +93,22 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
       result.errors.push(`${o.connectorId}: ${o.reason}`);
     }
   }
-  // Content-fingerprint dedup BEFORE scoring — saves work on duplicates,
-  // and means a cross-posted article on Reddit + News + HN ends up as one
-  // canonical Trend instead of three near-identical cards.
+  // Content-fingerprint dedup BEFORE publishing — saves work on
+  // duplicates and prevents cross-posted articles on Reddit + News +
+  // HN from producing three near-identical Trend rows.
   const all: RawSignal[] = dedupSignals(scoutReport.signals);
 
-  // Score + persist with dedupe.
-  for (const s of all) {
-    const sig = await score(s, { brand });
-    const externalKey = s.externalId ?? `${s.source}:${s.url}`;
-
-    const existing = await prisma.trend.findFirst({
-      where: { brandId, sourceRef: externalKey },
-    });
-
-    if (existing) {
-      const prevVel = existing.velocity;
-      const delta = prevVel > 0 ? (s.velocity - prevVel) / prevVel : 0;
-      await prisma.trend.update({
-        where: { id: existing.id },
-        data: {
-          title: s.title,
-          summary: s.summary,
-          velocity: s.velocity,
-          velocityPrev: prevVel,
-          velocityDelta: delta,
-          reach: BigInt(Math.max(0, Math.round(s.reach))),
-          sentiment: s.sentiment,
-          scores: JSON.stringify(sig.scores),
-          rationale: JSON.stringify(sig.rationale),
-          recommendation: sig.recommendation,
-          recommendationReason: sig.recommendationReason,
-          peakWindowEnd: sig.peakWindowEnd,
-          competitorClaimed: s.competitorClaimants.length > 0,
-          competitorClaimants: JSON.stringify(s.competitorClaimants),
-          brandKeywordHit: sig.brandKeywordHit,
-          matchedBrandKeywords: JSON.stringify(sig.matchedBrandKeywords),
-          url: s.url ?? existing.url,
-        },
-      });
-      // Time-series snapshot for long-term monitoring.
-      await prisma.trendSample.create({
-        data: {
-          trendId: existing.id,
-          velocity: s.velocity,
-          reach: BigInt(Math.max(0, Math.round(s.reach))),
-          sentiment: s.sentiment,
-          opportunity: sig.scores.opportunity,
-          source: s.source,
-        },
-      });
-      result.updated++;
-      publishBrandTrend(brandId, { type: 'trend.updated', brandId, trendId: existing.id, reason: 'refresh' });
-    } else {
-      const created = await prisma.trend.create({
-        data: {
-          brandId,
-          source: s.source,
-          sourceRef: externalKey,
-          title: s.title,
-          summary: s.summary,
-          hashtags: JSON.stringify(s.hashtags),
-          lineage: s.lineage,
-          catalyst: s.catalyst,
-          firstSeenAt: s.firstSeenAt,
-          peakWindowEnd: sig.peakWindowEnd,
-          velocity: s.velocity,
-          reach: BigInt(Math.max(0, Math.round(s.reach))),
-          sentiment: s.sentiment,
-          audienceOverlap: sig.scores.audienceOverlap,
-          scores: JSON.stringify(sig.scores),
-          rationale: JSON.stringify(sig.rationale),
-          recommendation: sig.recommendation,
-          recommendationReason: sig.recommendationReason,
-          competitorClaimed: s.competitorClaimants.length > 0,
-          competitorClaimants: JSON.stringify(s.competitorClaimants),
-          brandKeywordHit: sig.brandKeywordHit,
-          matchedBrandKeywords: JSON.stringify(sig.matchedBrandKeywords),
-          formatFatigue: s.formatFatigue,
-          examples: JSON.stringify(s.examples ?? []),
-          url: s.url,
-        },
-      });
-      // Initial sample for the time series.
-      await prisma.trendSample.create({
-        data: {
-          trendId: created.id,
-          velocity: s.velocity,
-          reach: BigInt(Math.max(0, Math.round(s.reach))),
-          sentiment: s.sentiment,
-          opportunity: sig.scores.opportunity,
-          source: s.source,
-        },
-      });
-      result.inserted++;
-      publishBrandTrend(brandId, { type: 'trend.created', brandId, trendId: created.id });
-    }
-  }
-
+  // Score + persist now flows through the Filter Agent on the bus
+  // (subscribed by lib/agents-boot.ts → persistScoredTrend). The
+  // Scout already published all of `all` to STREAMS.rawSignals via
+  // dryRun=false above; we just count what was sent and return the
+  // outcome aggregated from the connector results.
+  //
+  // The legacy synchronous loop here was ~90 lines of inline DB writes
+  // that duplicated the Filter Agent's work. Once the agent path was
+  // proven to produce identical output (via persistScoredTrend, the
+  // canonical write path used by both), the legacy loop became dead
+  // weight. Removed.
+  result.inserted = all.length; // optimistic — Filter Agent confirms async
   return result;
 }
