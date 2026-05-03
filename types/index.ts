@@ -174,6 +174,15 @@ export interface Trend {
   firstSeenAt: string;
   peakAt?: string;
   peakWindowEnd?: string;
+  /** Predictive Virality (Phase 1). When the cascade has ≥3 TrendSamples,
+   *  forecastPeak() fits a logistic curve and emits the predicted peak
+   *  time + confidence. UI renders as a phase pill on the TrendCard
+   *  ("growing 60%", "peaking 80%", etc.) with a stable `now`-state
+   *  gating so SSR doesn't drift from client. */
+  predictedPeakAt?: string;
+  predictedPeakConfidence?: number;
+  /** 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying' */
+  cascadePhase?: string;
   velocity: number;       // posts/hour or %change
   reach: number;
   sentiment: number;      // -1..1
