@@ -93,7 +93,41 @@ export async function listTrends(brandId: string, opts: ListTrendOpts = {}): Pro
   if (opts.recommendations?.length) where.recommendation = { in: opts.recommendations };
   if (typeof opts.competitorClaimed === 'boolean') where.competitorClaimed = opts.competitorClaimed;
 
-  let rows = await prisma.trend.findMany({ where, take: opts.limit ?? 200, orderBy: { firstSeenAt: 'desc' } });
+  // ──────────────────────────────────────────────────────────────────────
+  // Priority unioning: brand-keyword hits + pinned trends are ALWAYS
+  // included regardless of limit. Without this, dense news ingestion
+  // (e.g. 60 news articles published in the last hour) pushes
+  // high-importance trends out of the top-N-by-firstSeenAt window, and
+  // the Brand Matches / Pinned Watchlist columns appear empty.
+  //
+  // The implementation: fetch the priority rows + the top-N-recent rows
+  // separately, then dedupe by id.
+  // ──────────────────────────────────────────────────────────────────────
+  const limit = opts.limit ?? 200;
+
+  const [priorityRows, recentRows] = await Promise.all([
+    prisma.trend.findMany({
+      where: { ...where, OR: [{ brandKeywordHit: true }, { pinned: true }] },
+      orderBy: { firstSeenAt: 'desc' },
+      // Hard cap to prevent runaway result sizes if a brand somehow has
+      // thousands of brand-keyword hits or pinned items.
+      take: 500,
+    }),
+    prisma.trend.findMany({
+      where,
+      take: limit,
+      orderBy: { firstSeenAt: 'desc' },
+    }),
+  ]);
+
+  const seen = new Set<string>();
+  const merged: typeof priorityRows = [];
+  for (const r of [...priorityRows, ...recentRows]) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    merged.push(r);
+  }
+  const rows = merged;
 
   // Apply filters not directly mapped to columns (we stored scores as JSON).
   let items = rows.map(rowToTrend);
