@@ -299,6 +299,14 @@ export interface ColumnFilters {
    *  to undefined = no category filter, show all gtrends signals.
    *  Only meaningful when filters.sources includes 'google_trends'. */
   gtrendsCategory?: string;
+  /** When true, this column TAPS the trend stream without participating in
+   *  the cross-column claim phase — same behavior as Alerts / Risk Watch
+   *  / Decay Watch / Crisis Watch / Compliance Hold. Use for "show me
+   *  everything" catch-all panels (e.g. an all-categories Google Trends
+   *  column alongside the specific category columns) where duplication
+   *  with other lanes is acceptable because the operator wants the
+   *  unfiltered view as a reference. */
+  observerOnly?: boolean;
 }
 
 export interface BoardConfig {
