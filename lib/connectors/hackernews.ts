@@ -58,7 +58,10 @@ export class HackerNewsConnector implements Connector {
             firstSeenAt: new Date(createdMs),
             velocity: (h.points ?? 0) / ageHours,
             reach: 0,
-            sentiment: 0.1,
+            // Sentiment: HN doesn't expose sentiment. The previous 0.1
+            // constant was a hand-wavy "news skews mildly positive" prior
+            // that polluted scoring with no evidence. Emit 0.
+            sentiment: 0,
             competitorClaimants,
             formatFatigue: 0.05,
             url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,

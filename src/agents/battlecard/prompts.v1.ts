@@ -32,8 +32,9 @@ Rules:
 - COUNTER CLAIM — single positioning sentence the brand owns that the
   competitor's claim can't match. Required for 'counter' / 'out-flank',
   null otherwise.
-- DO NOT DO — 2-4 specific moves that would backfire here (e.g.
-  "don't compare specs side-by-side — Samsung wins that frame").
+- DO NOT DO — 2-4 specific moves that would backfire here. The shape:
+  "don't <action> — <competitor or context> wins that frame". Tailor
+  the example to the brand's actual category, not consumer electronics.
 - DO NOT INVENT facts. If you don't know something, leave the field
   empty rather than fabricate.
 

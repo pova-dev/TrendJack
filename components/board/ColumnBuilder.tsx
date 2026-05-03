@@ -57,6 +57,16 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
   const [sortKey, setSortKey] = React.useState<string>((initial?.sort.key as string) ?? 'opportunity');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>(initial?.sort.dir ?? 'desc');
 
+  // Escape closes the modal — Round 4 a11y audit caught this missing.
+  React.useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const toggle = <T,>(set: React.Dispatch<React.SetStateAction<T[]>>, v: T) =>
@@ -97,11 +107,16 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-3xl rounded-xl bg-ink-900 border border-ink-700 shadow-pop max-h-[88vh] overflow-y-auto"
-           onClick={e => e.stopPropagation()}>
+      <div
+        className="relative w-full max-w-3xl rounded-xl bg-ink-900 border border-ink-700 shadow-pop max-h-[88vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="column-builder-title"
+      >
         <header className="px-5 py-3 border-b border-ink-700 flex items-center justify-between sticky top-0 bg-ink-900 z-10">
-          <h2 className="text-sm font-semibold text-ink-100">{initial ? 'Edit column' : 'New column'}</h2>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-100 text-lg leading-none">×</button>
+          <h2 id="column-builder-title" className="text-sm font-semibold text-ink-100">{initial ? 'Edit column' : 'New column'}</h2>
+          <button onClick={onClose} aria-label="Close column builder" className="text-ink-400 hover:text-ink-100 text-lg leading-none">×</button>
         </header>
         <div className="p-5 space-y-5">
           <Section title="Title">
@@ -204,7 +219,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
 
           {sources.length === 0 || sources.includes('news') ? (
             <Section title="News domain filters">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Allow only these</Label>
                   <ChipInput tone="good" value={newsAllow} onChange={setNewsAllow} placeholder="reuters.com, theverge.com" />
@@ -226,7 +241,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
           </Section>
 
           <Section title="Refresh & sort">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Picker label="Refresh" value={String(refreshSec)} onChange={v => setRefreshSec(Number(v))}
                 options={[['30','30s'],['60','60s'],['120','2m'],['300','5m'],['900','15m'],['3600','1h']]} />
               <Picker label="Sort by" value={sortKey} onChange={setSortKey}

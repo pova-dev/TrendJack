@@ -125,37 +125,72 @@ const fashionSeed: SeedSignal[] = [
 ];
 
 // ─── Finance / fintech ───────────────────────────────────────────────────
+// Finance — geo-neutral. The previous seed was India-coded (RBI,
+// Razorpay, ₹10k SIP, r/IndiaInvestments) which surfaced foreign-
+// market signals to US/CA/UK fintech tenants. Round 4 audit caught
+// Vault (US/CA) seeing Indian central-bank news.
 const financeSeed: SeedSignal[] = [
   {
-    source: 'news', title: 'RBI cuts repo rate by 25 bps to 5.25%',
-    summary: 'India\'s central bank surprises markets with a quarter-point cut.',
+    source: 'news', title: 'Central bank holds rates steady as inflation cools',
+    summary: 'Policymakers maintain the benchmark rate, citing easing CPI prints.',
     hashtags: ['#fintech', '#economy'], lineage: 'Bloomberg · 1h ago',
     firstSeenAt: HOURS_AGO(1),
     velocity: 800, reach: 1_200_000, sentiment: 0.3,
     competitorClaimants: [], formatFatigue: 0,
-    url: 'https://www.bloomberg.com/news/rbi-rate-cut-2026',
+    url: 'https://www.bloomberg.com/news/central-bank-2026',
   },
   {
-    source: 'news', title: 'Razorpay raises $300M Series F at $9B valuation',
-    summary: 'Indian payments giant Razorpay closes new round led by Tiger Global.',
-    hashtags: ['#fintech', '#funding'], lineage: 'TechCrunch · 3h ago',
+    source: 'news', title: 'Stripe expands embedded-finance APIs to underbanked SMB segment',
+    summary: 'Payments incumbent rolls out new SMB-targeted financial products.',
+    hashtags: ['#fintech', '#smb'], lineage: 'TechCrunch · 3h ago',
     firstSeenAt: HOURS_AGO(3),
-    velocity: 220, reach: 180_000, sentiment: 0.6,
-    competitorClaimants: ['Razorpay'], formatFatigue: 0,
-    url: 'https://techcrunch.com/2026/05/razorpay-series-f',
+    velocity: 220, reach: 180_000, sentiment: 0.5,
+    competitorClaimants: ['Stripe'], formatFatigue: 0,
+    url: 'https://techcrunch.com/2026/05/stripe-embedded-finance',
   },
   {
-    source: 'reddit', title: 'Best mutual funds for SIP in 2026?',
-    summary: 'Looking to start a 5-year SIP, ₹10k/month. Suggestions?',
-    hashtags: ['#investing'], lineage: 'r/IndiaInvestments · 320 upvotes',
+    source: 'reddit', title: 'Gig workers — how do you handle variable monthly income?',
+    summary: 'Looking for budgeting tools that handle income that swings 40% month-to-month.',
+    hashtags: ['#personalfinance'], lineage: 'r/personalfinance · 320 upvotes',
     firstSeenAt: HOURS_AGO(8),
-    velocity: 35, reach: 12_000, sentiment: 0.1,
+    velocity: 35, reach: 12_000, sentiment: 0,
     competitorClaimants: [], formatFatigue: 0,
-    url: 'https://www.reddit.com/r/IndiaInvestments/comments/seed1',
+    url: 'https://www.reddit.com/r/personalfinance/comments/seed1',
   },
 ];
 
-// ─── SaaS / B2B ──────────────────────────────────────────────────────────
+// ─── Home goods / decor / lifestyle ─────────────────────────────────────
+const homeSeed: SeedSignal[] = [
+  {
+    source: 'news', title: 'Maximalism is back — 2026 home design trend report',
+    summary: 'Pinterest data shows a 3x rise in saved boards tagged maximalist + warm-tone.',
+    hashtags: ['#home', '#decor'], lineage: 'Architectural Digest · 4h ago',
+    firstSeenAt: HOURS_AGO(4),
+    velocity: 110, reach: 95_000, sentiment: 0.4,
+    competitorClaimants: [], formatFatigue: 0,
+    url: 'https://www.architecturaldigest.com/story/maximalism-2026',
+  },
+  {
+    source: 'reddit', title: 'Best non-toxic candle brands? Burning through inventory faster than expected',
+    summary: 'Looking for clean-burn brands that don\'t leave soot on white walls.',
+    hashtags: ['#home', '#candles'], lineage: 'r/homedecor · 280 upvotes',
+    firstSeenAt: HOURS_AGO(6),
+    velocity: 40, reach: 14_000, sentiment: 0.1,
+    competitorClaimants: [], formatFatigue: 0,
+    url: 'https://www.reddit.com/r/homedecor/comments/seed1',
+  },
+  {
+    source: 'news', title: 'West Elm launches limited ceramics collection with independent makers',
+    summary: 'Curated 12-piece line drops Friday, priced $24-$160.',
+    hashtags: ['#home', '#ceramics'], lineage: 'NYT Style · 2h ago',
+    firstSeenAt: HOURS_AGO(2),
+    velocity: 95, reach: 65_000, sentiment: 0.5,
+    competitorClaimants: ['West Elm'], formatFatigue: 0,
+    url: 'https://www.nytimes.com/2026/05/west-elm-ceramics',
+  },
+];
+
+// ─── SaaS / B2B (general) ──────────────────────────────────────────────
 const saasSeed: SeedSignal[] = [
   {
     source: 'news', title: 'Anthropic releases Claude Opus 5 with 2M context window',
@@ -183,6 +218,39 @@ const saasSeed: SeedSignal[] = [
     velocity: 180, reach: 220_000, sentiment: 0.5,
     competitorClaimants: ['Linear'], formatFatigue: 0,
     url: 'https://techcrunch.com/2026/05/linear-granola',
+  },
+];
+
+// ─── B2B operations / logistics / warehouse-ops ──────────────────────────
+// Round 4 audit caught Strider (warehouse-ops B2B SaaS) getting general
+// SaaS seed (Claude Opus / Linear / Salesforce) — none warehouse-flavored.
+const opsB2bSeed: SeedSignal[] = [
+  {
+    source: 'news', title: '3PLs miss peak-season SLAs as labor markets tighten',
+    summary: 'Third-party logistics providers report 18% SLA-miss rate vs Q4 last year.',
+    hashtags: ['#logistics', '#3pl'], lineage: 'Supply Chain Dive · 2h ago',
+    firstSeenAt: HOURS_AGO(2),
+    velocity: 140, reach: 75_000, sentiment: -0.2,
+    competitorClaimants: [], formatFatigue: 0,
+    url: 'https://www.supplychaindive.com/news/3pl-peak-2026',
+  },
+  {
+    source: 'reddit', title: 'WMS recommendations for a 50k-SKU 3PL? Manhattan is too heavy',
+    summary: 'Need warehouse management that doesn\'t require a 6-month implementation.',
+    hashtags: ['#warehouse', '#wms'], lineage: 'r/supplychain · 240 upvotes',
+    firstSeenAt: HOURS_AGO(6),
+    velocity: 45, reach: 11_000, sentiment: -0.1,
+    competitorClaimants: ['Manhattan'], formatFatigue: 0,
+    url: 'https://www.reddit.com/r/supplychain/comments/seed1',
+  },
+  {
+    source: 'news', title: 'DC-ops teams are trading dashboards for handheld scans — productivity up 22%',
+    summary: 'Case study from a 3M sq ft DC: streamlined inventory scans cut decision latency.',
+    hashtags: ['#operations', '#warehouse'], lineage: 'Modern Materials Handling · 4h ago',
+    firstSeenAt: HOURS_AGO(4),
+    velocity: 80, reach: 28_000, sentiment: 0.5,
+    competitorClaimants: [], formatFatigue: 0,
+    url: 'https://www.mmh.com/article/dc-ops-2026',
   },
 ];
 
@@ -235,13 +303,23 @@ const genericSeed: SeedSignal[] = [
 export function pickSeedForBrand(category: string, brandName?: string): RawSignal[] {
   const blob = `${category} ${brandName ?? ''}`.toLowerCase();
   let bucket: SeedSignal[];
-  if (/phone|smartphone|mobile|consumer\s*tech|electronics|gadget|device|smartwatch/.test(blob)) {
+  // Order matters: warehouse-ops / logistics / supply-chain B2B is
+  // checked before general SaaS so Strider (warehouse-ops platform)
+  // doesn't fall through to the Claude/Linear/Salesforce seed.
+  if (/warehouse|logistics|supply\s*chain|3pl|fulfillment|wms|tms|ops\s*platform|operations/.test(blob)) {
+    bucket = opsB2bSeed;
+  } else if (/phone|smartphone|mobile|consumer\s*tech|electronics|gadget|device|smartwatch/.test(blob)) {
     bucket = smartphoneSeed;
-  } else if (/fashion|footwear|apparel|sneaker|shoe|clothing|luxury|footwear|garment/.test(blob)) {
+  } else if (/fashion|footwear|apparel|sneaker|shoe|clothing|luxury|garment|jewelry/.test(blob)) {
     bucket = fashionSeed;
+  // Home before generic so DTC home goods (candles, ceramics, decor)
+  // routes correctly. Was previously falling through to genericSeed
+  // (Round 4 author-agent finding).
+  } else if (/home|decor|furniture|candle|ceramic|kitchen|bedding|garden|lifestyle/.test(blob)) {
+    bucket = homeSeed;
   } else if (/finance|fintech|bank|invest|payment|crypto|wealth|loan|insurance/.test(blob)) {
     bucket = financeSeed;
-  } else if (/saas|b2b|enterprise|software|dev[\s-]?tool|platform|api/.test(blob)) {
+  } else if (/saas|b2b|enterprise|software|dev[\s-]?tool|platform|api|crm|erp/.test(blob)) {
     bucket = saasSeed;
   } else if (/health|wellness|fitness|supplement|pharma|nutrition|skincare|beauty/.test(blob)) {
     bucket = healthSeed;

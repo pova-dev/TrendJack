@@ -25,7 +25,11 @@ export default async function SettingsLayout({ children }: { children: React.Rea
         trendCount={0}
         postNowCount={0}
       />
-      <div className="flex flex-1 overflow-hidden">
+      {/* flex-col on mobile so SettingsNav's mobile chip strip renders
+          as a horizontal strip ABOVE content (not as a vertical bar
+          to the LEFT, which was Round 4's P0 regression). flex-row
+          desktop keeps the original sidebar layout. */}
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         <SettingsNav />
         <div className="flex-1 overflow-y-auto">
           {children}
