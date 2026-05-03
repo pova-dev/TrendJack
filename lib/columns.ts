@@ -126,16 +126,25 @@ export function assignTrendsToColumns(
     for (const t of matches) claimed.add(t.id);
   }
 
-  // Phase 2: SECONDARY columns (Rising Trends / High Velocity Posts /
-  // First-Mover Window / etc.) show their full filtered view BUT
-  // exclude trends already claimed by a primary lane. This keeps
-  // the catch-all views informative without duplicating the
-  // brand-specific lanes' content.
-  for (const col of cols) {
-    if (!SECONDARY_TYPES.has(col.type)) continue;
+  // Phase 2: SECONDARY columns. Each excludes trends already claimed
+  // by a primary lane AND by earlier secondaries — so First-Mover
+  // Window and Rising Trends don't show the same 3 cards. Order by
+  // specificity (more specific claims first):
+  //   high_velocity      — minReach + minVelocity (most specific)
+  //   first_mover_window — firstMoverOnly + maybe minReach
+  //   rising_trends      — just minVelocity (broadest)
+  const secondaryCols = cols
+    .map((c, idx) => ({ c, idx, score: specificityScore(c.filters) }))
+    .filter(({ c }) => SECONDARY_TYPES.has(c.type))
+    .sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      return a.idx - b.idx;
+    });
+  for (const { c: col } of secondaryCols) {
     let matches = applyColumnFilter(col, trends, claimed);
     if (col.filters.clusterSimilar) matches = clusterByBrandKeyword(matches);
     result.set(col.id, matches);
+    for (const t of matches) claimed.add(t.id);
   }
 
   // Phase 3: OBSERVER columns (Alerts / Risk / Decay / Compliance /
