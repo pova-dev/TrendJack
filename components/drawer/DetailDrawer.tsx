@@ -12,6 +12,7 @@ import { Chip } from '@/components/ui/Chip';
 import { formatBig, relTime, timeUntil, pct } from '@/lib/utils';
 import { resolveSourceUrl } from '@/lib/source-link';
 import { Sparkline } from '@/components/trend/Sparkline';
+import { cn } from '@/lib/utils';
 
 // Static display data for the Hook Library + Templates picker. Mirrors
 // what's in src/agents/creative/hooks.ts and templates.ts but inlined
