@@ -18,6 +18,8 @@ import 'server-only';
 import { prisma } from './db';
 import { buildLineageLookup, type LineageReport } from '@/src/agents/lineage';
 import { listTrends } from './store';
+import { getBus } from '@/src/core/state';
+import { STREAMS } from '@/src/core/state/streams';
 
 interface BrandLineage {
   brandId: string;
@@ -44,11 +46,43 @@ export function startLineageCron(): void {
 
 async function runOnce(): Promise<void> {
   try {
+    const bus = getBus();
     const brands = await prisma.brand.findMany({ select: { id: true } });
     for (const b of brands) {
       const trends = await listTrends(b.id, { limit: 500, excludeDismissed: true });
       const reports = buildLineageLookup(trends);
+      const prev = CACHE.get(b.id)?.reports;
       CACHE.set(b.id, { brandId: b.id, builtAt: new Date(), reports });
+
+      // Battle-Card trigger emission. For each report whose isDilutive
+      // flag flipped from false → true (or that's newly seen as dilutive),
+      // publish to STREAMS.lineage so the BattleCard agent can react.
+      // Skipping previously-emitted dilutive reports keeps fan-out
+      // bounded — the agent's own 6h debounce is the second guard.
+      for (const [trendId, report] of reports.entries()) {
+        if (!report.isDilutive && report.competitorClaimants.length === 0) continue;
+        const wasDilutive = prev?.get(trendId)?.isDilutive ?? false;
+        const wasCompetitorClaimed = (prev?.get(trendId)?.competitorClaimants.length ?? 0) > 0;
+        const justBecame = (report.isDilutive && !wasDilutive)
+                        || (report.competitorClaimants.length > 0 && !wasCompetitorClaimed);
+        if (!justBecame && prev) continue;  // already emitted on a previous tick
+        await bus.publish(STREAMS.lineage, {
+          trendId,
+          brandId: b.id,
+          patientZero: {
+            source: report.patientZero.source,
+            url: report.patientZero.url,
+            publishedAt: report.patientZero.publishedAt,
+            excerpt: report.patientZero.excerpt ?? '',
+          },
+          siblings: report.siblings.map(s => ({
+            source: s.source, url: s.url, firstSeenAt: s.firstSeenAt,
+          })),
+          competitorShareOfVoice: report.competitorShareOfVoice,
+          competitorClaimants: report.competitorClaimants,
+          isDilutive: report.isDilutive,
+        });
+      }
     }
   } catch (err) {
     // eslint-disable-next-line no-console
