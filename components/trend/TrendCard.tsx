@@ -189,7 +189,32 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           when not present, we fall back to the recommendationReason
           which already carries the brand-fit / risk explanation. Click
           opens the drawer with the Lineage tab pre-focused. */}
-      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5">{displayLineage(trend.lineage)}</p>
+      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5 flex items-center gap-1.5">
+        <span className="truncate">{displayLineage(trend.lineage)}</span>
+        {/* Predictive Virality phase pill — only renders when forecastPeak
+            has produced a result. Confidence-aware copy: "growing 60%",
+            "peaking 80%", "decaying 40%". `now` gating preserved through
+            the parent `now` state — the pill itself is static. */}
+        {trend.cascadePhase && trend.predictedPeakConfidence !== undefined && trend.predictedPeakConfidence > 0 && (
+          <Chip
+            tone={
+              trend.cascadePhase === 'fast-growing-initial' ? 'good' :
+              trend.cascadePhase === 'peaking'              ? 'flare' :
+              trend.cascadePhase === 'decaying'             ? 'warn' :
+                                                              'neutral'
+            }
+            className="!px-1 !py-0 ml-auto flex-shrink-0"
+            title={`Predictive Virality (${Math.round(trend.predictedPeakConfidence * 100)}% confidence) — ${trend.cascadePhase.replace(/-/g, ' ')}`}
+          >
+            {trend.cascadePhase === 'fast-growing-initial' ? 'growing' :
+             trend.cascadePhase === 'peaking'              ? 'peaking' :
+             trend.cascadePhase === 'decaying'             ? 'decay'   :
+                                                             trend.cascadePhase}
+            {' '}
+            <span className="font-mono tabular-nums">{Math.round(trend.predictedPeakConfidence * 100)}%</span>
+          </Chip>
+        )}
+      </p>
       <p
         className="text-2xs text-flare-400/80 line-clamp-1 mb-1.5 italic"
         title={trend.recommendationReason}

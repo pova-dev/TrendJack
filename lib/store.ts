@@ -21,6 +21,7 @@ import type {
 } from '@/types';
 import { DEFAULT_WEIGHTS } from '@/types';
 import { score, type RawSignal } from '@/lib/scoring/engine';
+import { forecastPeak } from '@/src/core/scoring/cascade';
 
 // -----------------------------------------------------------------------------
 // Brand
@@ -426,6 +427,9 @@ function rowToTrend(r: Awaited<ReturnType<typeof prisma.trend.findUnique>>): Tre
     firstSeenAt: r.firstSeenAt.toISOString(),
     peakAt: r.peakAt?.toISOString(),
     peakWindowEnd: r.peakWindowEnd?.toISOString(),
+    predictedPeakAt: r.predictedPeakAt?.toISOString(),
+    predictedPeakConfidence: r.predictedPeakConfidence ?? undefined,
+    cascadePhase: r.cascadePhase ?? undefined,
     velocity: r.velocity,
     reach: Number(r.reach),
     sentiment: r.sentiment,
@@ -538,6 +542,11 @@ export async function persistScoredTrend(
         source: signal.source,
       },
     });
+    // Predictive Virality (Phase 1): re-run forecastPeak now that a fresh
+    // sample has been written. Only meaningful with ≥3 samples; below
+    // that the function returns null + 0 confidence and we leave the
+    // columns as-is (last-good wins).
+    await maybeWriteForecast(existing.id);
     publishBrandTrend(brandId, { type: 'trend.updated', brandId, trendId: existing.id, reason: 'refresh' });
     return { outcome: 'updated', trendId: existing.id };
   }
@@ -581,6 +590,40 @@ export async function persistScoredTrend(
       source: signal.source,
     },
   });
+  // Brand-new trend: 1 sample → forecast returns 0-confidence pre-launch.
+  // Worth running anyway so the cascadePhase column has a value rather than
+  // null on first sight; it'll get refined on the second tick.
+  await maybeWriteForecast(created.id);
   publishBrandTrend(brandId, { type: 'trend.created', brandId, trendId: created.id });
   return { outcome: 'inserted', trendId: created.id };
+}
+
+/** Re-run forecastPeak() against a trend's TrendSample series and
+ *  persist the result. Idempotent — safe to call on every persist tick.
+ *  Returns silently when there isn't enough history to forecast. */
+async function maybeWriteForecast(trendId: string): Promise<void> {
+  const samples = await prisma.trendSample.findMany({
+    where: { trendId },
+    orderBy: { sampledAt: 'asc' },
+    take: 20,
+    select: { sampledAt: true, velocity: true, reach: true },
+  });
+  if (samples.length < 3) {
+    // Below the floor: leave columns as-is (preserves last-good when an
+    // earlier tick had a forecast that's still a valid recent reading).
+    return;
+  }
+  const f = forecastPeak(samples.map(s => ({
+    sampledAt: s.sampledAt,
+    velocity: s.velocity,
+    reach: Number(s.reach),
+  })));
+  await prisma.trend.update({
+    where: { id: trendId },
+    data: {
+      predictedPeakAt: f.predictedPeakAt,
+      predictedPeakConfidence: f.predictedPeakConfidence,
+      cascadePhase: f.phase,
+    },
+  });
 }

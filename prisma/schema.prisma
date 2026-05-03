@@ -141,6 +141,12 @@ model Trend {
   recommendationReason String
   competitorClaimed    Boolean  @default(false)
   competitorClaimants  String   @default("[]")
+  /// Predictive Virality (Phase 1) — populated by forecastPeak()
+  /// against the trend's TrendSample series. Nullable so trends with
+  /// <3 samples render as `—` rather than throwing.
+  predictedPeakAt          DateTime?
+  predictedPeakConfidence  Float?
+  cascadePhase             String?   // 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying'
   /// True iff one of brand.brandKeywords was found in title/summary/text.
   /// Powers the Brand Matches column filter (independent of brandFit
   /// composite score). A "POVA Curve 2 review" article hits this; an
