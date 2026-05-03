@@ -16,6 +16,8 @@ import { NitterConnector } from './connectors/nitter';
 import { InvidiousConnector } from './connectors/invidious';
 import { RsshubConnector } from './connectors/rsshub';
 import { GoogleTrendsConnector } from './connectors/googletrends';
+import { XTrendingConnector } from './connectors/x-trending';
+import { MetaAdLibraryConnector } from './connectors/meta-ads';
 import { publishBrandTrend } from './realtime/bus';
 import { runScout, fromConnector } from '@/src/agents/scout/runner';
 import { dedupSignals } from '@/src/agents/scout/dedup';
@@ -87,6 +89,8 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
         fromConnector(new InvidiousConnector()),
         fromConnector(new RsshubConnector()),
         fromConnector(new GoogleTrendsConnector()),
+        fromConnector(new XTrendingConnector()),
+        fromConnector(new MetaAdLibraryConnector()),
       ],
       perPollTimeoutMs: 15_000,
       // Phase 4.1 wired: Scout now publishes to STREAMS.rawSignals so
