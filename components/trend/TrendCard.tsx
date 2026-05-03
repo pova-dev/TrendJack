@@ -180,7 +180,14 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
             recommendation directly with what it labels, removes the
             row-4 ml-auto gap that felt cluttered. */}
         <span className="ml-auto flex-shrink-0">
-          <RecommendationBadge rec={trend.recommendation} />
+          <RecommendationBadge
+            rec={trend.recommendation}
+            learnedDirection={
+              typeof trend.calibrationBoost === 'number' && Math.abs(trend.calibrationBoost - 1) > 0.05
+                ? trend.calibrationBoost > 1 ? 'up' : 'down'
+                : undefined
+            }
+          />
         </span>
       </h3>
 

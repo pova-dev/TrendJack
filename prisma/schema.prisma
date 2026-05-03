@@ -147,6 +147,10 @@ model Trend {
   predictedPeakAt          DateTime?
   predictedPeakConfidence  Float?
   cascadePhase             String?   // 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying'
+  /// Calibration multiplier applied to opportunity at score time (Feature D).
+  /// 1.0 = no nudge (cold start); >1 = boosted; <1 = dragged. UI renders
+  /// a ↑/↓ glyph next to the recommendation badge when |boost-1| > 0.05.
+  calibrationBoost         Float?
   /// True iff one of brand.brandKeywords was found in title/summary/text.
   /// Powers the Brand Matches column filter (independent of brandFit
   /// composite score). A "POVA Curve 2 review" article hits this; an

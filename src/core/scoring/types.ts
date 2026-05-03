@@ -100,4 +100,8 @@ export interface ScoreResult {
    * `opportunity` which drives dashboard ranking.
    */
   jackingScore: number;
+  /** Calibration multiplier applied to opportunity at score time
+   *  (Feature D). 1.0 = no nudge / cold start. UI threshold for the
+   *  ↑/↓ glyph is |boost - 1| > 0.05. */
+  calibrationBoost?: number;
 }

@@ -85,7 +85,12 @@ export function GuidedTour() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 motion-safe:transition-opacity"
+      // pointer-events-auto restores click-handling for the overlay +
+      // children. The dashboard <main> is gated `pointer-events-none`
+      // while the tour is open, but the GuidedTour itself mounts inside
+      // <main>, so without this auto-override the modal would inherit
+      // the disabled state and the "Got it" button wouldn't fire.
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 motion-safe:transition-opacity pointer-events-auto"
       onClick={dismiss}
       role="dialog"
       aria-modal="true"
