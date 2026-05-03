@@ -10,6 +10,7 @@ import 'server-only';
 import { prisma } from './db';
 import { analyzeCascade } from '@/src/core/scoring/cascade';
 import { contentFingerprint } from '@/src/agents/scout/dedup';
+import { getCachedLineage } from './lineage-cron';
 import type { RawSignal } from '@/src/core/scoring/types';
 
 export interface SignalEnrichment {
@@ -58,36 +59,46 @@ export async function enrichSignal(
     }
   }
 
-  // 2. Cross-source spillover: count distinct sources where the same
-  //    fingerprint appears in the last 24h. Used by Sp multiplier.
-  const fp = contentFingerprint({ title: signal.title });
-  if (fp) {
-    const since = new Date(Date.now() - 24 * 3_600_000);
-    const siblings = await prisma.trend.findMany({
-      where: {
-        brandId,
-        firstSeenAt: { gte: since },
-      },
-      select: { source: true, title: true, competitorClaimants: true },
-      take: 200,
-    });
-    const matchingSources = new Set<string>();
-    let totalMatching = 0;
-    let claimedMatching = 0;
-    for (const t of siblings) {
-      if (contentFingerprint({ title: t.title }) !== fp) continue;
-      matchingSources.add(t.source);
-      totalMatching++;
-      try {
-        const claimants = JSON.parse(t.competitorClaimants) as string[];
-        if (claimants.length > 0) claimedMatching++;
-      } catch { /* malformed JSON — treat as zero */ }
+  // 2. Cross-source spillover + competitor SoV.
+  //    Fast path: the LineageCron pre-computes a per-brand map every
+  //    60s. We try that first to avoid the per-trend fingerprint scan.
+  const cached = trend ? getCachedLineage(brandId, trend.id) : undefined;
+  if (cached) {
+    if (cached.siblings.length + 1 > 1) {
+      out.crossSourceCount = new Set([
+        cached.patientZero.source,
+        ...cached.siblings.map(s => s.source),
+      ]).size;
     }
-    if (matchingSources.size > 0) {
-      out.crossSourceCount = matchingSources.size;
+    if (cached.competitorShareOfVoice > 0) {
+      out.competitorShareOfVoice = cached.competitorShareOfVoice;
     }
-    if (totalMatching > 0) {
-      out.competitorShareOfVoice = claimedMatching / totalMatching;
+  } else {
+    // Fallback path — cache miss (cold start, brand-new trend not yet
+    // in the lineage build). Per-trend fingerprint scan over the last
+    // 24h. Same logic as before, just gated.
+    const fp = contentFingerprint({ title: signal.title });
+    if (fp) {
+      const since = new Date(Date.now() - 24 * 3_600_000);
+      const siblings = await prisma.trend.findMany({
+        where: { brandId, firstSeenAt: { gte: since } },
+        select: { source: true, title: true, competitorClaimants: true },
+        take: 200,
+      });
+      const matchingSources = new Set<string>();
+      let totalMatching = 0;
+      let claimedMatching = 0;
+      for (const t of siblings) {
+        if (contentFingerprint({ title: t.title }) !== fp) continue;
+        matchingSources.add(t.source);
+        totalMatching++;
+        try {
+          const claimants = JSON.parse(t.competitorClaimants) as string[];
+          if (claimants.length > 0) claimedMatching++;
+        } catch { /* malformed JSON */ }
+      }
+      if (matchingSources.size > 0) out.crossSourceCount = matchingSources.size;
+      if (totalMatching > 0) out.competitorShareOfVoice = claimedMatching / totalMatching;
     }
   }
 
