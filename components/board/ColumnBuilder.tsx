@@ -70,8 +70,12 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
         sources: sources.length ? sources : undefined,
         recommendations: recs.length ? recs : undefined,
         minOpportunity: minOpp || undefined,
-        maxRisk: maxRisk < 1 ? maxRisk : undefined,
-        maxCringe: maxCringe < 1 ? maxCringe : undefined,
+        // 0 means "no filter" — persisting 0 would filter out every
+        // trend whose risk/cringe is even slightly > 0, which is almost
+        // every trend. Treat 0 as the sentinel for "off" and only
+        // persist values in (0, 1).
+        maxRisk: maxRisk > 0 && maxRisk < 1 ? maxRisk : undefined,
+        maxCringe: maxCringe > 0 && maxCringe < 1 ? maxCringe : undefined,
         minVelocity: minVelocity > 0 ? minVelocity : undefined,
         windowHours: windowHours > 0 ? windowHours : undefined,
         firstMoverOnly: firstMoverOnly || undefined,
