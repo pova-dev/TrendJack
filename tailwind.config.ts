@@ -37,6 +37,17 @@ const config: Config = {
           blue: '#3B82F6',
           violet: '#8B5CF6',
         },
+        // Semantic aliases — map to the same hues as signal.* so designers
+        // and code can reach for the meaning ("good" / "bad") rather than
+        // the literal hue. The 300/400/500 stops give us hover + emphasis
+        // headroom inside Tailwind's @apply / arbitrary-opacity machinery
+        // (e.g. `bg-good-500/10`, `text-good-300`, `border-good-500/40`).
+        // Round 3 audit found 27 callsites using `text-good-400`, etc.
+        // that were silently dead before this block existed.
+        good:  { 300: '#86EFAC', 400: '#4ADE80', 500: '#22C55E' },
+        bad:   { 300: '#FCA5A5', 400: '#F87171', 500: '#EF4444' },
+        warn:  { 300: '#FCD34D', 400: '#FBBF24', 500: '#F59E0B' },
+        info:  { 300: '#93C5FD', 400: '#60A5FA', 500: '#3B82F6' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],

@@ -96,7 +96,7 @@ export function BrandEditor({ initial }: Props) {
             <ChipInput tone="warn" value={brand.tone.forbiddenStyles} onChange={v => patchAndSave({ tone: { ...brand.tone, forbiddenStyles: v } })} placeholder="lifestyle warmth, motivational cliché…" />
           </Field>
           <Field label="Allowed jokes / on-theme keywords" className="mt-3">
-            <ChipInput tone="info" value={brand.tone.allowedJokes} onChange={v => patchAndSave({ tone: { ...brand.tone, allowedJokes: v } })} placeholder="battery, gaming, thermal…" />
+            <ChipInput tone="info" value={brand.tone.allowedJokes} onChange={v => patchAndSave({ tone: { ...brand.tone, allowedJokes: v } })} placeholder="topics your brand can riff on (e.g. category specifics)" />
           </Field>
         </div>
 
@@ -107,15 +107,14 @@ export function BrandEditor({ initial }: Props) {
           </div>
           <p className="text-2xs text-ink-300 mb-3">
             Trends that mention any of these land in <span className="font-mono text-flare-400">Brand Matches</span>.
-            Add your brand name, parent company, product lines, and common variants — e.g.
-            <span className="font-mono text-ink-200"> pova, pova mobile, pova curve, pova 7, tecno, tecno mobile</span>.
-            Keep them specific: short generic terms like <span className="font-mono">phone</span> would over-match.
+            Add your brand name, parent company, product lines, and common variants.
+            Keep them specific: generic terms (e.g. <span className="font-mono">phone</span>, <span className="font-mono">shoes</span>) over-match.
           </p>
           <ChipInput
             tone="flare"
             value={brand.brandKeywords ?? []}
             onChange={v => patchAndSave({ brandKeywords: v })}
-            placeholder="pova, tecno pova, pova curve, pova 7…"
+            placeholder={`${brand.name?.toLowerCase() || 'your brand'}, ${brand.name?.toLowerCase() || 'product'} pro, parent company…`}
           />
         </div>
 
@@ -166,10 +165,10 @@ export function BrandEditor({ initial }: Props) {
             <ChipInput tone="bad" value={brand.bannedTopics} onChange={v => patchAndSave({ bannedTopics: v })} placeholder="politics, religion, tragedy…" />
           </Field>
           <Field label="Safe themes — boost trends that match" className="mt-3">
-            <ChipInput tone="good" value={brand.safeThemes} onChange={v => patchAndSave({ safeThemes: v })} placeholder="battery, gaming, design…" />
+            <ChipInput tone="good" value={brand.safeThemes} onChange={v => patchAndSave({ safeThemes: v })} placeholder="themes that fit your brand POV" />
           </Field>
           <Field label="Competitors" className="mt-3">
-            <ChipInput tone="neutral" value={brand.competitors} onChange={v => patchAndSave({ competitors: v })} placeholder="Xiaomi, Samsung, Realme…" />
+            <ChipInput tone="neutral" value={brand.competitors} onChange={v => patchAndSave({ competitors: v })} placeholder="competitor brand names" />
           </Field>
         </div>
 
@@ -194,14 +193,14 @@ export function BrandEditor({ initial }: Props) {
         <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
           <h2 className="text-sm font-semibold text-ink-100 mb-2">Audience</h2>
           <Field label="Primary segments">
-            <ChipInput value={brand.audience.primary} onChange={v => patchAndSave({ audience: { ...brand.audience, primary: v } })} placeholder="Gen Z, students, gamers…" />
+            <ChipInput value={brand.audience.primary} onChange={v => patchAndSave({ audience: { ...brand.audience, primary: v } })} placeholder="primary audience segments" />
           </Field>
           <div className="grid grid-cols-2 gap-3 mt-3">
             <Field label="Age range">
               <input value={brand.audience.age} onChange={e => patchAndSave({ audience: { ...brand.audience, age: e.target.value } })} className={inputCls} placeholder="18-28" />
             </Field>
             <Field label="Psychographics">
-              <ChipInput value={brand.audience.psychographics} onChange={v => patchAndSave({ audience: { ...brand.audience, psychographics: v } })} placeholder="value-conscious, irony-fluent…" />
+              <ChipInput value={brand.audience.psychographics} onChange={v => patchAndSave({ audience: { ...brand.audience, psychographics: v } })} placeholder="design-conscious, value-led, irony-fluent…" />
             </Field>
           </div>
         </div>

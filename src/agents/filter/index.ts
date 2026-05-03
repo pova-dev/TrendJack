@@ -103,6 +103,9 @@ export function startFilterAgent(deps: FilterAgentDeps): FilterAgentHandle {
           // We pass undefined if the loaded brand somehow lacks orgId so
           // the budget tracker treats it as "no quota" (Infinity).
           orgId: brand.orgId,
+          // Verifier sets per-brand confidence floor based on this:
+          // 'low' rejects below 0.50, 'high' accepts down to 0.20.
+          brandRiskTolerance: brand.riskTolerance,
           fetchedAt: body.fetchedAt,
           shouldVerify: scoreResult.jackingScore >= AUTO_VERIFY_THRESHOLD,
         });

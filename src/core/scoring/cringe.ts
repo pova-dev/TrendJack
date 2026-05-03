@@ -31,20 +31,48 @@ export const AD_SPEAK_STEMS = [
   'seamless', 'frictionless', 'turnkey', 'holistic', 'curated experience',
 ];
 
+// Universal hype stems — these read as desperate / clickbait in any
+// category and on any platform. Don't put category-specific vocabulary
+// here; that goes in TECH_HYPE_STEMS below and is gated by category.
 export const HYPE_STEMS = [
   'wild', 'insane', 'crazy', 'stunning', 'shocking', 'jaw-dropping',
   'jaw dropping', 'mind-blowing', 'mind blowing', 'breathtaking',
-  'breakthrough', 'blazing', 'lavish', 'gorgeous', 'epic', 'absurd',
+  'breakthrough', 'blazing', 'epic', 'absurd',
   'ludicrous', 'monstrous', 'beast', 'beastly', 'whopping',
   'mega', 'ultra', 'super', 'massive', 'huge', 'biggest', 'fastest',
-  'sleek', 'sleekest', 'thinnest', 'lightest', 'most powerful', 'most advanced',
+  'most powerful', 'most advanced',
   'unbelievable', 'incredible', 'amazing', 'astonishing', 'remarkabl',
   'won\'t believe', 'wont believe', 'you need to know',
-  // phone / consumer-tech marketing adjectives
-  'fashionable', 'stylish', 'elegant', 'premium', 'iconic', 'flagship',
-  'powerhouse', 'must-have', 'must have', 'finally', 'finally arrived',
+  'must-have', 'must have', 'finally', 'finally arrived',
+];
+
+// Tech / consumer-electronics hype stems. Words like 'sleek', 'flagship',
+// 'powerhouse', 'thinnest' read as cringe in smartphone marketing copy
+// but are LEGITIMATE on-brand vocabulary for fashion (lavish, gorgeous),
+// home goods (sleek, elegant), and luxury (iconic, premium). Round 3
+// cross-category audit caught these unfairly inflating cringe for
+// non-tech brands. Gate via brand.category.
+export const TECH_HYPE_STEMS = [
+  'sleek', 'sleekest', 'thinnest', 'lightest',
+  'flagship', 'powerhouse',
   'official', 'officially', 'exclusive', 'limited edition',
 ];
+
+// Category vocabulary that's domain-specific cringe but on-brand
+// elsewhere. We don't classify these as universal hype; they activate
+// only when the brand's category mismatches their natural home.
+export const FASHION_LIFESTYLE_HYPE_STEMS = [
+  'lavish', 'gorgeous', 'fashionable', 'stylish', 'elegant',
+  'premium', 'iconic',
+];
+
+function isTechCategory(category: string): boolean {
+  return /(phone|smartphone|laptop|gadget|electronics|tech|hardware|device)/i.test(category || '');
+}
+
+function isFashionLifestyleCategory(category: string): boolean {
+  return /(fashion|apparel|footwear|sneaker|clothing|streetwear|luxury|jewelry|cosmetic|beauty|home|decor|furniture|candle|ceramic)/i.test(category || '');
+}
 
 export const FORCED_SLANG_TRIGGERS = [
   'rizz up the world', 'how do you do fellow kids', 'we listen we don',
@@ -84,7 +112,18 @@ export function computeCringe(s: RawSignal, b: BrandProfile, r: ScoreRationale[]
   //    the actual cringe vector for most signal we ingest. Lower per-hit
   //    weight (0.06) but very common, so they create real spread across
   //    the distribution instead of clustering at the floor.
-  const hypeHits = HYPE_STEMS.filter(c => matchStem(blob, c));
+  //
+  //    Round 3 cross-category fix: HYPE_STEMS now contains only universal
+  //    cringe vocabulary. Tech-specific words ('sleek', 'flagship') and
+  //    fashion/lifestyle words ('elegant', 'premium') are gated by brand
+  //    category — a luxury home-goods brand legitimately uses 'sleek'
+  //    + 'elegant' as on-brand vocabulary, not as cringe.
+  const hypePool = [
+    ...HYPE_STEMS,
+    ...(isTechCategory(b.category) ? TECH_HYPE_STEMS : []),
+    ...(isFashionLifestyleCategory(b.category) ? [] : FASHION_LIFESTYLE_HYPE_STEMS),
+  ];
+  const hypeHits = hypePool.filter(c => matchStem(blob, c));
   if (hypeHits.length) {
     v += Math.min(0.30, 0.06 * hypeHits.length);
     reasons.push(`hype adjective${hypeHits.length > 1 ? 's' : ''}: ${hypeHits.slice(0, 3).join(', ')}`);

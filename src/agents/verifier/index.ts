@@ -30,7 +30,29 @@ export interface VerifierAgentHandle {
   stop: () => void;
 }
 
-const CONFIDENCE_FLOOR = 0.30;
+// Per-brand confidence floor. Filter Agent passes brandRiskTolerance via
+// the ScoredTrendMessage (when available); the Verifier maps that to the
+// minimum claim confidence we'll accept before passing the claim through
+// to the draft. Conservative brands ('low' tolerance) reject anything
+// below 0.50; aggressive brands ('high') accept down to 0.20. Default
+// 'medium' = 0.30, matching the legacy fixed floor.
+//
+// Round 3 audit (Rational Thinker) flagged the previous fixed floor as a
+// gap: brand.riskTolerance was in the schema but never threaded through
+// to verification.
+const CONFIDENCE_FLOORS: Record<'low' | 'medium' | 'high', number> = {
+  low: 0.50,
+  medium: 0.30,
+  high: 0.20,
+};
+const DEFAULT_CONFIDENCE_FLOOR = 0.30;
+
+function floorForBrand(tolerance: string | undefined): number {
+  if (tolerance === 'low' || tolerance === 'medium' || tolerance === 'high') {
+    return CONFIDENCE_FLOORS[tolerance];
+  }
+  return DEFAULT_CONFIDENCE_FLOOR;
+}
 
 export function startVerifierAgent(deps: VerifierAgentDeps): VerifierAgentHandle {
   const group = deps.consumerGroup ?? 'verifier-agent';
@@ -54,12 +76,14 @@ export function startVerifierAgent(deps: VerifierAgentDeps): VerifierAgentHandle
           orgId: body.orgId,
         });
 
-        // Demote any claim below confidence floor — model wasn't sure
-        // enough for us to ship the value to a draft.
-        const verified = out.claims.filter(c => c.confidence >= CONFIDENCE_FLOOR);
+        const floor = floorForBrand(body.brandRiskTolerance);
+
+        // Demote any claim below the per-brand confidence floor — model
+        // wasn't sure enough given how risk-tolerant the brand is.
+        const verified = out.claims.filter(c => c.confidence >= floor);
         const demoted = out.claims
-          .filter(c => c.confidence < CONFIDENCE_FLOOR)
-          .map(c => ({ key: c.key, reason: `confidence ${c.confidence.toFixed(2)} below ${CONFIDENCE_FLOOR}` }));
+          .filter(c => c.confidence < floor)
+          .map(c => ({ key: c.key, reason: `confidence ${c.confidence.toFixed(2)} below ${floor.toFixed(2)} (${body.brandRiskTolerance ?? 'default'})` }));
 
         const result: VerificationResult = {
           trendId: body.signal.externalId ?? `${body.signal.source}:${body.signal.url ?? body.signal.title}`,

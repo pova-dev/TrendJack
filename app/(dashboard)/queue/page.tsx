@@ -32,7 +32,7 @@ export default async function QueuePage() {
         <p className="text-sm text-ink-300 mb-6">
           {candidates.length} trend(s) waiting on action. Approval mode is <Chip tone="warn">{brand.approvalMode}</Chip>.
         </p>
-        <div className="rounded-md border border-ink-700 overflow-hidden">
+        <div className="rounded-md border border-ink-700 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-ink-800 text-2xs uppercase tracking-wider text-ink-300">
               <tr>

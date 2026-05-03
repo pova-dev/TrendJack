@@ -140,7 +140,10 @@ export class RedditLiveConnector implements Connector {
       lineage: `Reddit · ${lineage} · ${d.subreddit_name_prefixed} · ${d.ups} upvotes / ${d.num_comments} comments in ${ageHours.toFixed(1)}h.`,
       firstSeenAt: new Date(createdMs),
       velocity,
-      reach: d.ups * 30 + d.num_comments * 10,
+      // Reddit does NOT expose impressions/views via the public JSON API.
+      // The previous code synthesized `ups*30 + comments*10` — pure
+      // fabrication, violating CLAUDE.md hard rule 1. Emit 0; UI renders '—'.
+      reach: 0,
       sentiment: d.upvote_ratio ? (d.upvote_ratio - 0.5) * 2 : 0,
       competitorClaimants,
       formatFatigue: 0.1,

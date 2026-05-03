@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { signupAction } from '@/lib/auth/actions';
+import { SubmitButton } from '@/components/auth/SubmitButton';
 
 export default function SignupPage() {
   return (
@@ -13,15 +14,13 @@ export default function SignupPage() {
         <h1 className="text-base font-semibold text-ink-100 mb-1">Spin up your war room</h1>
         <p className="text-xs text-ink-300 mb-5">Sign up, set up your brand, see live signals — all in &lt; 60 seconds.</p>
         <form action={signupAction} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Your name" name="name" required />
             <Field label="Org / company" name="orgName" required />
           </div>
           <Field label="Email" name="email" type="email" required />
           <Field label="Password" name="password" type="password" minLength={8} required hint="Min 8 chars" />
-          <button type="submit" className="w-full h-9 rounded-md bg-flare-500 text-ink-950 font-semibold hover:bg-flare-400 text-sm">
-            Create account
-          </button>
+          <SubmitButton idleLabel="Create account" busyLabel="Creating account…" />
         </form>
         <p className="mt-4 text-xs text-ink-400">
           Already have one? <Link href="/signin" className="text-flare-400 hover:underline">Sign in</Link>

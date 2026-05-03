@@ -11,7 +11,14 @@ interface TabsProps {
 
 export function Tabs({ value, onChange, tabs, className }: TabsProps) {
   return (
-    <div className={cn('flex border-b border-ink-700', className)} role="tablist">
+    // overflow-x-auto on the strip lets 6+ tabs (DetailDrawer's
+    // Overview/Scores/Drafts/Research/Battle/Room/Lineage) horizontally
+    // scroll instead of clipping at narrow viewports. Round 3 audit
+    // caught right-most tabs vanishing offscreen at 360px width.
+    <div
+      className={cn('flex border-b border-ink-700 overflow-x-auto -mx-3 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}
+      role="tablist"
+    >
       {tabs.map(t => (
         <button
           key={t.value}
@@ -19,7 +26,7 @@ export function Tabs({ value, onChange, tabs, className }: TabsProps) {
           role="tab"
           aria-selected={value === t.value}
           className={cn(
-            'px-3 py-3 sm:py-2 text-xs font-medium motion-safe:transition-colors relative rounded-t-md',
+            'flex-shrink-0 whitespace-nowrap px-3 py-3 sm:py-2 text-xs font-medium motion-safe:transition-colors relative rounded-t-md',
             focusRing,
             value === t.value
               ? 'text-ink-100'
@@ -31,7 +38,7 @@ export function Tabs({ value, onChange, tabs, className }: TabsProps) {
             <span className="ml-1 text-ink-400">({t.count})</span>
           )}
           {value === t.value && (
-            <span className="absolute bottom-0 left-0 right-0 h-px bg-flare-500" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-flare-500" />
           )}
         </button>
       ))}

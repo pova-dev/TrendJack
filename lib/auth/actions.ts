@@ -165,37 +165,41 @@ export async function createBrandAction(form: FormData): Promise<void> {
     });
   }
 
+  // Category-aware defaults — Round 3 cross-category audit caught the
+  // previous defaults silently injecting POVA-shaped identity (Gen Z
+  // mobile-first, TikTok-flavored platforms, motivational-cliché bans)
+  // into Vault (fintech), Hearth (home goods), and Strider (B2B SaaS).
+  const audienceDefault = audienceDefaultsForCategory(parsed.data.category);
+  const platformsDefault = priorityPlatformsForCategory(parsed.data.category);
+  const bannedTopicsDefault = bannedTopicsForCategory(parsed.data.category);
+
   const brand = await prisma.brand.create({
     data: {
       orgId: session.orgId,
       name: parsed.data.brandName,
       category: parsed.data.category,
       markets: JSON.stringify(markets),
-      audience: JSON.stringify({
-        primary: ['Gen Z', 'young professionals'],
-        age: '18-30',
-        psychographics: ['mobile-first', 'value-conscious'],
-      }),
+      audience: JSON.stringify(audienceDefault),
       tone: JSON.stringify({
-        voice: parsed.data.voice ?? 'Sharp. Direct. Confident.',
+        voice: parsed.data.voice ?? '',
         tagline: parsed.data.tagline ?? '',
-        bannedPhrases: bannedPhrases.length > 0
-          ? bannedPhrases
-          : ['unleash your potential', 'best version of yourself', 'level up', 'redefine'],
+        // Empty defaults — operator fills via /brand. The previous default
+        // ('unleash your potential', 'level up', 'lifestyle warmth') was
+        // smartphone-marketing flavored and either irrelevant (B2B SaaS)
+        // or actively wrong (home goods, where lifestyle warmth IS the
+        // voice). Empty = operator must consciously decide.
+        bannedPhrases,
         allowedJokes,
-        forbiddenStyles: forbiddenStyles.length > 0
-          ? forbiddenStyles
-          : ['lifestyle warmth', 'motivational cliché'],
+        forbiddenStyles,
       }),
-      bannedTopics: JSON.stringify(['politics', 'religion', 'tragedy']),
-      // Seed brandKeywords with the brand name + a few common variants so
-      // the user has SOMETHING in Brand Matches on day one. They'll add
-      // product names + market suffixes via /brand later.
+      bannedTopics: JSON.stringify(bannedTopicsDefault),
+      // Seed only the name + lowercase variant. Category-specific suffixes
+      // ("mobile", "india", etc.) would silently fabricate brand identity.
       brandKeywords: JSON.stringify(deriveDefaultBrandKeywords(parsed.data.brandName)),
       gtrendsCategories: JSON.stringify(gtrendsCategories),
       safeThemes: JSON.stringify([parsed.data.category.toLowerCase()]),
       competitors: JSON.stringify(competitors),
-      priorityPlatforms: JSON.stringify(['x', 'youtube', 'reddit', 'tiktok']),
+      priorityPlatforms: JSON.stringify(platformsDefault),
       contentGoal: 'engagement',
       riskTolerance: parsed.data.riskTolerance,
       approvalMode: parsed.data.approvalMode,
@@ -241,20 +245,81 @@ function defaultColumns() {
   ];
 }
 
-// Generates sensible default brand keywords from the brand name. Users
-// will refine these from /brand → keywords (e.g. add product names like
-// "POVA Curve", "POVA 7", or parent brand "Tecno"). The goal is to give
-// signup an immediately-useful Brand Matches column.
+// Generates sensible default brand keywords from the brand name. We seed
+// only the brand name + lowercase form — anything else (product lines,
+// market suffixes) is brand/category-specific and would silently inject
+// false identity into non-POVA tenants. (Round 3 cross-category audit
+// caught the previous "${name} mobile / phone / india" seeds polluting
+// Solera/Vault/Hearth/Strider tenants from day one.)
+//
+// Operator refines from /brand → Brand Keywords on first visit.
 function deriveDefaultBrandKeywords(name: string): string[] {
   const trimmed = name.trim();
   if (!trimmed) return [];
   const lower = trimmed.toLowerCase();
-  // Tokens: full name + lowercase + common phrase variants.
-  return Array.from(new Set([
-    trimmed,
-    lower,
-    `${lower} mobile`,
-    `${lower} phone`,
-    `${lower} india`,
-  ])).filter(t => t.length >= 2);
+  return Array.from(new Set([trimmed, lower].filter(t => t.length >= 2)));
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Category-aware seeded defaults. Each function takes the brand's
+// free-text category string and returns the seed for one field. Match
+// is loose-keyword (case-insensitive contains) so "DTC home goods" and
+// "candles & ceramics" both route to home-goods. Unmatched categories
+// fall back to a neutral generic seed — never to POVA-flavored copy.
+// ──────────────────────────────────────────────────────────────────────
+
+interface AudienceShape { primary: string[]; age: string; psychographics: string[] }
+
+function categoryClass(category: string): 'tech' | 'finance' | 'fashion' | 'home' | 'b2b' | 'health' | 'food' | 'generic' {
+  const c = category.toLowerCase();
+  if (/(phone|smartphone|laptop|gadget|electronics|tech|software|saas|ai\b|app)/.test(c)) {
+    if (/(b2b|enterprise|saas|crm|erp|ops|hr|fintech-saas)/.test(c)) return 'b2b';
+    return 'tech';
+  }
+  if (/(fintech|finance|bank|invest|crypto|wealth|loan|payment|insurance)/.test(c)) return 'finance';
+  if (/(fashion|apparel|footwear|shoe|sneaker|clothing|streetwear|luxury|jewelry|cosmetic|beauty)/.test(c)) return 'fashion';
+  if (/(home|decor|furniture|candle|ceramic|kitchen|bedding|garden|dtc home)/.test(c)) return 'home';
+  if (/(b2b|enterprise|warehouse|logistics|hr|crm|erp|ops)/.test(c)) return 'b2b';
+  if (/(health|wellness|fitness|nutrition|pharma|medical|telehealth|supplement)/.test(c)) return 'health';
+  if (/(food|beverage|drink|coffee|tea|snack|restaurant|cpg)/.test(c)) return 'food';
+  return 'generic';
+}
+
+function audienceDefaultsForCategory(category: string): AudienceShape {
+  switch (categoryClass(category)) {
+    case 'tech':    return { primary: [], age: '', psychographics: [] };  // tech defaults vary too widely; leave empty
+    case 'finance': return { primary: [], age: '', psychographics: ['financially literate', 'risk-aware'] };
+    case 'fashion': return { primary: [], age: '', psychographics: ['design-conscious'] };
+    case 'home':    return { primary: [], age: '', psychographics: ['aspirational', 'design-led'] };
+    case 'b2b':     return { primary: [], age: '', psychographics: ['operations-pragmatic', 'ROI-led'] };
+    case 'health':  return { primary: [], age: '', psychographics: ['wellness-led'] };
+    case 'food':    return { primary: [], age: '', psychographics: ['flavor-curious'] };
+    case 'generic': return { primary: [], age: '', psychographics: [] };
+  }
+}
+
+function priorityPlatformsForCategory(category: string): string[] {
+  switch (categoryClass(category)) {
+    case 'tech':    return ['x', 'youtube', 'reddit'];
+    case 'finance': return ['linkedin', 'x', 'youtube'];
+    case 'fashion': return ['instagram', 'tiktok', 'youtube'];
+    case 'home':    return ['instagram', 'pinterest', 'tiktok'];
+    case 'b2b':     return ['linkedin', 'x', 'youtube'];
+    case 'health':  return ['instagram', 'tiktok', 'youtube'];
+    case 'food':    return ['instagram', 'tiktok', 'youtube'];
+    case 'generic': return ['x', 'youtube', 'instagram'];
+  }
+}
+
+function bannedTopicsForCategory(category: string): string[] {
+  // Always banned regardless of vertical.
+  const universal = ['politics', 'religion', 'tragedy'];
+  switch (categoryClass(category)) {
+    // Regulated finance must avoid these — surfacing trends about them
+    // can drag drafts into compliance violations even if the operator
+    // doesn't act on them.
+    case 'finance': return [...universal, 'investment advice', 'guaranteed returns', 'get rich quick', 'risk-free'];
+    case 'health':  return [...universal, 'medical claims', 'cures', 'guaranteed results'];
+    default:        return universal;
+  }
 }

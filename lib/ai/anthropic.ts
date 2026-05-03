@@ -3,52 +3,35 @@ import type { BrandProfile, Draft, Trend } from '@/types';
 // Phase 1 deterministic generator. Phase 2 swaps to Anthropic SDK with the
 // prompt chain in lib/ai/prompts/*. The shape returned is identical so the
 // UI doesn't change.
+//
+// Round 3 cross-category audit caught the previous mock generator
+// hard-coding POVA-specific copy ("5000 mAh", "phones that survive",
+// "Built for what's next") that shipped silently to any tenant whose AI
+// keys hadn't been configured yet — Vault Fintech got smartphone copy.
+// The replacement below is intentionally generic and SELF-LABELED as
+// a placeholder: every variant carries a "[mock — configure AI to
+// generate brand-fit drafts]" hook prefix so operators can never
+// confuse it for real LLM output.
+
+const MOCK_DISCLAIMER_HOOK = '[mock placeholder — configure your AI provider for brand-fit drafts]';
 
 export async function generateDraftsMock(trend: Trend, brand: BrandProfile): Promise<Draft[]> {
   const platform = brand.priorityPlatforms[0] ?? 'x';
   const baseTime = new Date().toISOString();
 
-  const safeAngles = makeSafeAngles(trend, brand);
-  const boldAngle = makeBoldAngle(trend, brand);
-  const memeAngles = makeMemeAngles(trend, brand);
+  const variants = makeBrandAgnosticVariants(trend, brand);
 
-  const drafts: Draft[] = [
-    ...safeAngles.map((d, i) => toDraft({
-      ...d,
-      trendId: trend.id,
-      brandId: brand.id,
-      variant: 'safe',
-      platform,
-      cringeScore: 0.15 + i * 0.03,
-      id: `draft_${trend.id}_safe_${i}`,
-      createdAt: baseTime,
-      status: 'draft',
-    })),
-    toDraft({
-      ...boldAngle,
-      trendId: trend.id,
-      brandId: brand.id,
-      variant: 'bold',
-      platform,
-      cringeScore: 0.35,
-      id: `draft_${trend.id}_bold`,
-      createdAt: baseTime,
-      status: 'draft',
-    }),
-    ...memeAngles.map((d, i) => toDraft({
-      ...d,
-      trendId: trend.id,
-      brandId: brand.id,
-      variant: 'meme',
-      platform,
-      cringeScore: 0.25 + i * 0.04,
-      id: `draft_${trend.id}_meme_${i}`,
-      createdAt: baseTime,
-      status: 'draft',
-    })),
-  ];
-
-  return drafts;
+  return variants.map((d, i) => toDraft({
+    ...d,
+    trendId: trend.id,
+    brandId: brand.id,
+    variant: d.variant,
+    platform,
+    cringeScore: 0.20 + i * 0.04,
+    id: `draft_${trend.id}_mock_${i}`,
+    createdAt: baseTime,
+    status: 'draft',
+  }));
 }
 
 interface DraftBase {
@@ -58,67 +41,51 @@ interface DraftBase {
   visualBrief?: string;
   whyItWorks?: string;
   whatNotToSay?: string;
+  variant: 'safe' | 'bold' | 'meme';
 }
 
 function toDraft(p: DraftBase & Omit<Draft, keyof DraftBase>): Draft {
   return p as unknown as Draft;
 }
 
-function makeSafeAngles(t: Trend, b: BrandProfile): DraftBase[] {
+// Brand-agnostic placeholder drafts. We pull what we honestly know from
+// the brand profile (name, category, tagline, voice) and produce
+// instructional templates that any operator can edit. No invented facts,
+// no category-specific vocabulary.
+function makeBrandAgnosticVariants(t: Trend, b: BrandProfile): DraftBase[] {
+  const ref = t.title.length > 80 ? `${t.title.slice(0, 78)}…` : t.title;
+  const tagline = b.tone.tagline?.trim() || '';
+  const category = b.category?.trim() || 'your brand';
+
   return [
     {
-      hook: `Battery is the spec that actually changes your life.`,
-      body: `${shortRefFromTrend(t)} People aren't buying spec sheets. They're buying not-running-out-by-3pm.`,
-      cta: `${b.tone.tagline}`,
-      visualBrief: `Black background. POVA device, lower-center, ticker on left edge. No people, no lifestyle warmth.`,
-      whyItWorks: `Aligns with the rising "battery anxiety" thread, doesn't claim "best ever," reads as a brand POV instead of a feature ad.`,
-      whatNotToSay: `Avoid "unleash," "level up," and any battery-as-superpower metaphor.`,
+      variant: 'safe',
+      hook: `${MOCK_DISCLAIMER_HOOK} — Safe angle for ${b.name}`,
+      body: `Trend reference: "${ref}". Connect it to the ${category} POV your audience already trusts. Lead with a clear observation, follow with a specific insight, end with a soft pivot to your offer.`,
+      cta: tagline,
+      visualBrief: `Type-led post in your brand colors. Avoid stock imagery; lean on your typographic system.`,
+      whyItWorks: `Mock placeholder — real AI output will adapt hook + body to your brand voice and the trend's specific framing.`,
+      whatNotToSay: `Don't claim facts you can't cite. Don't fabricate competitor activity. Don't post until you've reviewed against /brand → Banned phrases.`,
     },
     {
-      hook: `5000 mAh is the new minimum.`,
-      body: `Anyone shipping less in 2026 is shipping last year. ${shortRefFromTrend(t)}`,
-      cta: `Built for what's next.`,
-      visualBrief: `Single number "5000" rendered massive in mono, orange ticker.`,
-      whyItWorks: `Direct, specific, anti-cliché — fits POVA's verbal identity.`,
-      whatNotToSay: `Don't quote competitor mAh numbers; that's a spec war we don't enter.`,
+      variant: 'bold',
+      hook: `${MOCK_DISCLAIMER_HOOK} — Bold angle for ${b.name}`,
+      body: `Trend reference: "${ref}". Take a contrarian read on what the trend assumes — your brand's POV usually disagrees with the consensus reaction. State it sharply.`,
+      cta: tagline,
+      visualBrief: `One bold visual element (single object, single number, single quote). Negative space dominates.`,
+      whyItWorks: `Mock placeholder — real AI output uses your tone.voice + bannedPhrases to find the brand-fit contrarian read.`,
+      whatNotToSay: `Don't name competitors. Don't make claims your verifier can't cite.`,
+    },
+    {
+      variant: 'meme',
+      hook: `${MOCK_DISCLAIMER_HOOK} — Meme/native angle for ${b.name}`,
+      body: `Trend reference: "${ref}". Match the platform's native cadence — short, no sales line. The trend itself is the setup; your one-liner is the punch.`,
+      cta: '',
+      visualBrief: `Match the format of the trend (text-only, screenshot, or remix). Resist over-designing.`,
+      whyItWorks: `Mock placeholder — real AI output is gated by your brand's allowedJokes + forbiddenStyles before shipping.`,
+      whatNotToSay: `Don't append a CTA — the joke IS the post.`,
     },
   ];
-}
-
-function makeBoldAngle(t: Trend, b: BrandProfile): DraftBase {
-  return {
-    hook: `If your phone overheats in 18 minutes, you didn't buy a phone. You bought a sandwich press.`,
-    body: `${shortRefFromTrend(t)} Performance you can't sustain isn't performance.`,
-    cta: `Built for what's next.`,
-    visualBrief: `Close-up of POVA back, no people, thermal motif via subtle gradient — never a literal flame.`,
-    whyItWorks: `Memorable, brand-voice, lands the thermal POV without naming a competitor.`,
-    whatNotToSay: `Do not name Realme/Samsung/etc. Do not include a "we don't overheat" claim — this leads with the joke.`,
-  };
-}
-
-function makeMemeAngles(t: Trend, b: BrandProfile): DraftBase[] {
-  return [
-    {
-      hook: `pov: your battery is at 84% and it's already 9pm`,
-      body: `the difference is the phone, not the charger.`,
-      cta: ``,
-      visualBrief: `Plain black, single line of mono text, orange POVA mark bottom-right.`,
-      whyItWorks: `Native meme cadence, no forced slang, on-format with current X/Reddit thread.`,
-      whatNotToSay: `Don't append a sales line. The joke IS the post.`,
-    },
-    {
-      hook: `we don't do flagship killers. we do phones that survive.`,
-      body: `${shortRefFromTrend(t)}`,
-      cta: ``,
-      visualBrief: `Type-only post. White on black. JetBrains Mono.`,
-      whyItWorks: `Rejects the cliché instead of using it — exactly the POVA voice.`,
-      whatNotToSay: `Don't claim "best." Don't add specs.`,
-    },
-  ];
-}
-
-function shortRefFromTrend(t: Trend): string {
-  return t.title.length > 60 ? '' : '';
 }
 
 // -----------------------------------------------------------------------------

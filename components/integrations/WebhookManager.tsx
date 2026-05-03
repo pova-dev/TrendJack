@@ -44,7 +44,7 @@ export function WebhookManager({ initial }: { initial: Webhook[] }) {
     <div className="space-y-5">
       <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
         <h2 className="text-sm font-semibold text-ink-100 mb-3">Add webhook</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Name (e.g. Slack #drafts)"
             className="h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100" />
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://hooks.slack.com/services/…"
