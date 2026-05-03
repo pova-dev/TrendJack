@@ -348,6 +348,94 @@ model AuditLog {
   @@index([orgId, createdAt])
 }
 
+/// Ship-It Plans — Feature F (Autonomous).
+///
+/// Composed by the ShipItComposer agent when `recommendation === POST_NOW
+/// && jackingScore >= 0.6 && cascadePhase === 'fast-growing-initial'
+/// && current battle-card with verdict in {counter, out-flank}` all
+/// hold for the same trend within a 30-min window. Operator approves
+/// or rejects; expired plans (peakWindowEnd passed) auto-supersede.
+///
+/// `payload` carries the structured plan: chosen angle, citation set,
+/// proposed schedule, draft variant id. Persisted as JSON for
+/// flexibility across plan versions.
+model ShipItPlan {
+  id              String   @id @default(cuid())
+  trendId         String
+  brandId         String
+  orgId           String
+  status          String   @default("draft") // draft | pending_approval | approved | rejected | shipped | expired | superseded
+  chosenAngleRef  String   // "<battleCardId>:<angleIndex>" or "draft:<draftId>"
+  draftVariantId  String?
+  payload         String   // JSON ShipItPlan
+  proposedScheduleAt DateTime
+  expiresAt       DateTime
+  promptVersion   String   @default("v1")
+  cost            Float    @default(0)
+  createdAt       DateTime @default(now())
+  decidedAt       DateTime?
+  decidedBy       String?
+  decisionReason  String?
+  shippedAt       DateTime?
+  postUrl         String?
+  @@index([brandId, status])
+  @@index([trendId, createdAt])
+}
+
+/// Trend Rooms — Feature E (Collaborative).
+///
+/// Per-trend ephemeral session for org members to discuss + vote +
+/// decide on a strategy together. One active room per trend (`@unique`
+/// on trendId), with comments threaded by parentId and votes weighted
+/// by Membership.role. The decision finalizer publishes to
+/// STREAMS.alerts AND STREAMS.operatorFeedback so collective decisions
+/// feed Feature D's calibration loop.
+model TrendRoom {
+  id             String   @id @default(cuid())
+  trendId        String   @unique
+  brandId        String
+  orgId          String
+  status         String   @default("open")  // open | decided | archived
+  decidedAngle   String?  // angleId from BattleCard or Draft variant id
+  decisionReason String?
+  decidedBy      String?  // userId
+  decidedAt      DateTime?
+  createdAt      DateTime @default(now())
+  comments       RoomComment[]
+  votes          RoomVote[]
+  @@index([brandId, status])
+  @@index([orgId, createdAt])
+}
+
+model RoomComment {
+  id         String   @id @default(cuid())
+  roomId     String
+  room       TrendRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId     String
+  parentId   String?  // threaded replies
+  /// What evidence are we commenting on?
+  /// 'battle-card.angle' | 'lineage.sibling' | 'citation' |
+  /// 'forecast' | 'draft.variant' | 'general'
+  anchorType String   @default("general")
+  anchorRef  String?  // id of the anchored entity
+  body       String
+  createdAt  DateTime @default(now())
+  @@index([roomId, createdAt])
+}
+
+model RoomVote {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      TrendRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  /// id from BattleCard.payload.angleOptions or Draft.id
+  angleId   String
+  weight    Int      @default(1)  // role-weighted
+  createdAt DateTime @default(now())
+  @@unique([roomId, userId, angleId])
+  @@index([roomId])
+}
+
 /// Operator feedback events (Feature D — Calibration Engine).
 ///
 /// Append-only log of every operator action on a trend, with a feature

@@ -44,7 +44,7 @@ interface Props {
   onAction: (id: string, type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin') => void;
 }
 
-type TabKey = 'overview' | 'scores' | 'drafts' | 'lineage' | 'research' | 'battle';
+type TabKey = 'overview' | 'scores' | 'drafts' | 'lineage' | 'research' | 'battle' | 'room';
 
 interface VerifiedClaimRender {
   id: string;
@@ -301,6 +301,7 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
             ...(trend.competitorClaimed
               ? [{ value: 'battle', label: 'Battle' } as const]
               : []),
+            { value: 'room',     label: 'Room' },
             { value: 'lineage',  label: 'Lineage' },
           ]}
           className="px-3"
@@ -325,6 +326,7 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
           {tab === 'drafts'   && <DraftsTab result={draftsResult} generating={generating} onGenerate={handleGenerate} />}
           {tab === 'research' && <ResearchTab data={research} loading={researching} onRun={handleResearch} />}
           {tab === 'battle'   && <BattleTab card={battleCard} loading={battleLoading} err={battleErr} onGenerate={handleGenerateBattleCard} />}
+          {tab === 'room'     && <RoomTab trendId={trend.id} />}
           {tab === 'lineage'  && <LineageTab trend={trend} probe={lineage} loading={probingLineage} onProbe={handleLineage} />}
         </div>
 
@@ -474,6 +476,157 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
           ResearchPanel rendered twice (P0b from the Trinity Swarm
           Visual Auditor). */}
       <ResearchSummaryStrip research={research} loading={researching} />
+    </>
+  );
+}
+
+// ─── Trend Room tab (Feature E — collaborative) ───────────────────────────
+interface RoomCommentRender {
+  id: string;
+  userId: string;
+  parentId: string | null;
+  anchorType: string;
+  anchorRef: string | null;
+  body: string;
+  createdAt: string;
+}
+interface RoomShape {
+  id: string;
+  trendId: string;
+  status: 'open' | 'decided' | 'archived';
+  decidedAngle?: string | null;
+  decisionReason?: string | null;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+  comments: RoomCommentRender[];
+  votes: { id: string; userId: string; angleId: string; weight: number }[];
+}
+
+function RoomTab({ trendId }: { trendId: string }) {
+  const [room, setRoom] = React.useState<RoomShape | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [body, setBody] = React.useState('');
+  const [posting, setPosting] = React.useState(false);
+
+  const reload = React.useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch(`/api/trends/${trendId}/room`);
+      if (r.status === 404) { setRoom(null); return; }
+      if (!r.ok) { setErr(`http_${r.status}`); return; }
+      setRoom(await r.json());
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [trendId]);
+
+  React.useEffect(() => { void reload(); }, [reload]);
+
+  async function openRoom() {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch(`/api/trends/${trendId}/room`, { method: 'POST' });
+      if (!r.ok) { setErr(`http_${r.status}`); return; }
+      setRoom(await r.json());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function postComment() {
+    if (!body.trim()) return;
+    setPosting(true);
+    try {
+      const r = await fetch(`/api/trends/${trendId}/room/comment`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body: body.trim() }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        setErr(j?.error ?? `http_${r.status}`);
+        return;
+      }
+      setBody('');
+      await reload();
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  if (loading && !room) {
+    return <p className="text-2xs text-ink-400 italic">Loading room…</p>;
+  }
+  if (!room) {
+    return (
+      <Section title="Trend Room">
+        <p className="text-xs text-ink-300 mb-2">
+          No room open for this trend yet. Open one to discuss strategy with your org —
+          comments, citations, and decisions are persisted in an audit trail.
+        </p>
+        {err && <p className="text-2xs text-bad-400 mb-2">{err}</p>}
+        <Button size="sm" onClick={openRoom}>+ Open Room</Button>
+      </Section>
+    );
+  }
+
+  return (
+    <>
+      <Section title={
+        <span className="flex items-center justify-between">
+          <span>Trend Room · {room.status}</span>
+          <span className="text-2xs font-mono text-ink-400">{room.comments.length} comments · {room.votes.length} votes</span>
+        </span>
+      }>
+        {room.status === 'decided' && room.decidedAngle && (
+          <div className="mb-3 rounded border border-good-500/40 bg-good-500/5 p-2 text-2xs">
+            <p className="text-good-400 font-mono uppercase tracking-wider mb-0.5">Decided</p>
+            <p className="text-ink-100">Angle: <span className="font-mono">{room.decidedAngle}</span></p>
+            {room.decisionReason && <p className="text-ink-300 mt-1">{room.decisionReason}</p>}
+          </div>
+        )}
+
+        <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+          {room.comments.length === 0 && (
+            <p className="text-2xs text-ink-400 italic">No comments yet — start the conversation.</p>
+          )}
+          {room.comments.map(c => (
+            <div key={c.id} className="rounded border border-ink-700 bg-ink-800/40 p-2 text-2xs">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Chip tone="info" className="text-2xs">{c.userId.slice(0, 8)}</Chip>
+                {c.anchorType !== 'general' && (
+                  <Chip tone="neutral" className="text-2xs">↪ {c.anchorType}</Chip>
+                )}
+                <span className="ml-auto text-ink-500">{new Date(c.createdAt).toLocaleTimeString()}</span>
+              </div>
+              <p className="text-ink-100 whitespace-pre-wrap">{c.body}</p>
+            </div>
+          ))}
+        </div>
+
+        {room.status === 'open' && (
+          <div className="mt-3 space-y-2">
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={2}
+              placeholder="Share your read on this trend…"
+              className="w-full rounded-md bg-ink-800 border border-ink-700 text-xs text-ink-100 px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+            />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={postComment} disabled={posting || !body.trim()}>
+                {posting ? '…' : 'Post comment'}
+              </Button>
+            </div>
+          </div>
+        )}
+        {err && <p className="mt-2 text-2xs text-bad-400">{err}</p>}
+      </Section>
     </>
   );
 }
