@@ -110,26 +110,35 @@ export function BoardColumn({
         className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2.5 border-b border-ink-700 bg-ink-850/95 backdrop-blur relative cursor-grab active:cursor-grabbing select-none rounded-t-xl"
         title="Drag column header to reorder"
       >
-        <span className="text-flare-400 font-mono text-sm select-none">⠿</span>
+        <span className="text-flare-400 font-mono text-sm select-none" title="Drag to reorder">⠿</span>
         <span className="text-ink-300 font-mono text-xs">{COLUMN_ICONS[column.type] ?? '·'}</span>
         <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-100 truncate">{column.title}</h2>
-        <span className="text-2xs font-mono text-ink-400 tabular-nums ml-auto">{trends.length}</span>
-        <span className="text-2xs font-mono text-ink-500 tabular-nums">⏱{tickLabel}</span>
-        {/* Sort selector — title attribute shows the current key on hover */}
+        <span
+          className="text-2xs font-mono text-ink-400 tabular-nums ml-auto bg-ink-800 rounded px-1.5 py-0.5"
+          title={`${trends.length} trends in this column`}
+        >
+          {trends.length}
+        </span>
+        {/* Sort selector — text label instead of cryptic glyph. Each
+            sort key gets a short word so the operator can read what's
+            active at a glance. */}
         <button
           draggable={false}
           onMouseDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); setSortOpen(v => !v); }}
-          className="text-2xs font-mono text-ink-400 hover:text-ink-100 px-1"
-          title={`Sort: ${SORT_LABELS[sortKey]}`}
+          className="flex items-center gap-1 text-2xs font-mono text-ink-300 hover:text-ink-100 hover:bg-ink-800 px-1.5 py-0.5 rounded border border-ink-700/60"
+          title={`Sort: ${SORT_LABELS[sortKey]} — click to change`}
         >
-          {sortKey === 'latest'      ? '↓⏱'
-           : sortKey === 'oldest'    ? '↑⏱'
-           : sortKey === 'volume'    ? '↓vol'
-           : sortKey === 'reach'     ? '↓reach'
-           : sortKey === 'opportunity' ? '↓opp'
-           : sortKey === 'cvs'       ? '↓cvs'
-           :                          '↓fit'}
+          <span className="text-ink-500">⇅</span>
+          <span>
+            {sortKey === 'latest'      ? 'newest'
+             : sortKey === 'oldest'    ? 'oldest'
+             : sortKey === 'volume'    ? 'volume'
+             : sortKey === 'reach'     ? 'reach'
+             : sortKey === 'opportunity' ? 'OPP'
+             : sortKey === 'cvs'       ? 'CVS'
+             :                          'FIT'}
+          </span>
         </button>
         {sortOpen && (
           <div
