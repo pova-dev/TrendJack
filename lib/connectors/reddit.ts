@@ -6,7 +6,17 @@
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
 import type { RawSignal } from '@/lib/scoring/engine';
 
-const DEFAULT_UA = 'trendjack/1.0 (https://trendjack.local; +operator)';
+// Reddit's API now rate-limits aggressively on generic UAs.
+// The convention they actually want: `<bot-name>/<version> by /u/<username>`
+// or a real browser UA. Without this, requests 429 immediately.
+//
+// Operator override: set REDDIT_USER_AGENT (org credential or env) to a
+// real reddit-style UA with a username they own, e.g.
+//   "trendjack/1.0 by /u/yourname"
+// That + ~30 req/min cadence is the sweet spot for unauthenticated
+// Reddit. Above that, OAuth via REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET
+// is the next step (not implemented yet).
+const DEFAULT_UA = 'Mozilla/5.0 (compatible; TrendJackBot/1.0; +https://trendjack.app/about)';
 
 interface RedditPost {
   data: {
@@ -44,34 +54,48 @@ export class RedditLiveConnector implements Connector {
     // PASS 1 — reddit-wide /search.json fan-out by brand keywords +
     // competitors + a couple themes. This is the primary signal: search
     // catches any post mentioning these terms regardless of sub.
+    // Cap fan-out aggressively. Reddit rate-limits unauthenticated
+    // requests at ~30/min; combined with the per-subreddit hot.json
+    // pass below, we want fewer than 12 search calls per tick to leave
+    // headroom for retries + avoid 429 / poll_timeout cascades.
     const searchTerms = Array.from(new Set([
-      ...brandKw.slice(0, 5),
-      ...competitors.slice(0, 4),
-      ...themes.slice(0, 3),
+      ...brandKw.slice(0, 3),
+      ...competitors.slice(0, 2),
+      ...themes.slice(0, 1),
     ]));
-    for (const q of searchTerms) {
+    // Per-request timeout + 200ms gap between requests. Without this,
+    // 21 sequential requests fan out at full speed and Reddit's edge
+    // either rate-limits us OR (worse) throttles the connection so the
+    // 15s outer poll timeout fires.
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const fetchWithTimeout = async (url: string) => {
       try {
-        const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&t=day&limit=15&raw_json=1`;
-        const res = await fetch(url, { headers });
-        if (!res.ok) continue;
+        return await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+      } catch { return null; }
+    };
+
+    for (const q of searchTerms) {
+      const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&t=day&limit=15&raw_json=1`;
+      const res = await fetchWithTimeout(url);
+      if (!res || !res.ok) { await sleep(200); continue; }
+      try {
         const json = await res.json() as { data?: { children?: RedditPost[] } };
         for (const c of json.data?.children ?? []) {
           this.appendSignal(c, since, competitorSet, signals, seen, `search "${q}"`);
         }
-      } catch { /* skip failed query */ }
+      } catch { /* skip malformed JSON */ }
+      await sleep(200);
     }
 
     // PASS 2 — community subs we trust to surface relevant content even
-    // when posts don't mention brand terms verbatim (e.g. r/IndianGaming
-    // talking about a "new gaming phone" generally). We still keyword-
-    // filter the bodies so off-topic posts (sports, politics) don't slip
-    // through, but we widen the filter to include themes.
+    // when posts don't mention brand terms verbatim. Same throttling.
+    // Capped to 4 subs to stay under Reddit's rate envelope.
     const filterKw = Array.from(new Set([...brandKw, ...themes.map(t => t.toLowerCase())]));
-    for (const sub of this.subs) {
+    for (const sub of this.subs.slice(0, 4)) {
+      const url = `https://www.reddit.com/r/${encodeURIComponent(sub)}/hot.json?limit=15&raw_json=1`;
+      const res = await fetchWithTimeout(url);
+      if (!res || !res.ok) { await sleep(200); continue; }
       try {
-        const url = `https://www.reddit.com/r/${encodeURIComponent(sub)}/hot.json?limit=15&raw_json=1`;
-        const res = await fetch(url, { headers });
-        if (!res.ok) continue;
         const json = await res.json() as { data?: { children?: RedditPost[] } };
         for (const c of json.data?.children ?? []) {
           const d = c.data;
@@ -81,6 +105,7 @@ export class RedditLiveConnector implements Connector {
           this.appendSignal(c, since, competitorSet, signals, seen, `r/${d.subreddit}`);
         }
       } catch { /* per-sub failures don't kill the poll */ }
+      await sleep(200);
     }
 
     return { ok: true, source: 'reddit', mode: 'live', signals, fetchedAt: new Date() };
