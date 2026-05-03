@@ -331,3 +331,34 @@ model AuditLog {
 
   @@index([orgId, createdAt])
 }
+
+/// Web Push subscriptions. One row per (user × device): a single user can
+/// install TrendJack on multiple devices and each registers its own
+/// PushSubscription via /api/push/subscribe.
+///
+/// Delivery is per-brand: the push-delivery worker subscribes to
+/// STREAMS.alerts and for each AlertMessage looks up all PushSubscriptions
+/// where brandId matches and fans out via web-push using the org's VAPID
+/// keys (env-level today; per-org override later).
+///
+/// The endpoint URL doubles as a stable identity for the subscription —
+/// browsers re-issue the same endpoint when they re-subscribe with the
+/// same VAPID key, so we upsert on it instead of generating a fresh row.
+/// Stale subscriptions (404 / 410 from the push service) get pruned by
+/// the delivery worker.
+model PushSubscription {
+  id         String   @id @default(cuid())
+  brandId    String
+  userId     String
+  endpoint   String   @unique
+  p256dh     String   // public key from PushSubscription.keys.p256dh
+  auth       String   // auth secret from PushSubscription.keys.auth
+  userAgent  String?  // captured from the request to help operators identify devices
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  failCount  Int      @default(0)
+
+  @@index([brandId])
+  @@index([userId])
+}

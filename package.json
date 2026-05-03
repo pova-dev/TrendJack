@@ -31,6 +31,7 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.74.0",
     "tailwind-merge": "^2.5.4",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8",
     "zustand": "^5.0.1"
   },
@@ -40,6 +41,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
