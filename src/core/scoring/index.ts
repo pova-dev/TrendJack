@@ -10,12 +10,16 @@ export type { RawSignal, ScoringContext, ScoreResult, TopicalFitResult } from '.
 // Matchers (used by ingest, watchlist, dedupe).
 export { matchKeyword, matchStem } from './matchers';
 
-// Jacking Score (Filter Agent + Creative Agent gate).
+// Jacking Score / S_max (Filter Agent + Creative Agent + Verifier triggers).
 export {
   computeJackingScore,
+  computeSignalStrength,
   shouldGenerateContent,
+  shouldAutoVerify,
   DEFAULT_JACKING_THRESHOLD,
+  AUTO_VERIFY_THRESHOLD,
   type JackingScoreInput,
+  type SignalStrengthInput,
 } from './jacking-score';
 
 // Vocabularies — exported so future tooling can introspect / extend.
