@@ -17,23 +17,51 @@ export default async function OnboardPage() {
         </div>
         <h1 className="text-xl font-semibold text-ink-100 mb-1">Set up your first brand</h1>
         <p className="text-sm text-ink-300 mb-6">
-          We&apos;ll seed your war room with realistic mock signals so you can see the system in action immediately.
+          We&apos;ll seed your war room with category-appropriate signals so you see a working dashboard within seconds.
           Edit anything later from <span className="text-ink-100">/brand</span>.
         </p>
         <form action={createBrandAction} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Brand name" name="brandName" required placeholder="e.g. POVA" />
-            <Field label="Category" name="category" required placeholder="e.g. Smartphones / D2C / SaaS" />
+            <Field label="Category" name="category" required placeholder="e.g. Smartphones / Footwear / Fintech" />
           </div>
           <Field label="Tagline (optional)" name="tagline" placeholder="e.g. Built for what's next." />
           <Textarea label="Voice" name="voice" rows={2} placeholder="One line. e.g. Sharp. Direct. Anti-cliché." />
           <Field label="Markets (comma-separated)" name="markets" placeholder="India, SEA, MEA" />
           <Field label="Competitors (comma-separated)" name="competitors" placeholder="Xiaomi, Realme, Samsung" />
-          <div className="grid grid-cols-2 gap-3">
+
+          <details className="rounded-md border border-ink-700 bg-ink-800/40 px-3 py-2">
+            <summary className="text-xs text-ink-300 cursor-pointer select-none hover:text-ink-100">
+              Tone capture (optional)
+            </summary>
+            <div className="mt-3 space-y-3">
+              <Field label="Banned phrases (comma-separated)" name="bannedPhrases"
+                placeholder="unleash, level up, dream big" />
+              <Field label="Forbidden styles (comma-separated)" name="forbiddenStyles"
+                placeholder="lifestyle warmth, motivational cliché, doom messaging" />
+              <Field label="Allowed jokes (comma-separated)" name="allowedJokes"
+                placeholder="material science nerdery, self-aware luxury" />
+            </div>
+          </details>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Select
+              label="Your role"
+              name="role"
+              options={['owner', 'admin', 'strategist', 'operator', 'approver', 'viewer']}
+              defaultValue="owner"
+            />
             <Select label="Risk tolerance" name="riskTolerance" options={['low', 'medium', 'high']} defaultValue="medium" />
             <Select label="Approval mode" name="approvalMode" options={['strict', 'moderate', 'fast']} defaultValue="moderate" />
           </div>
-          <button type="submit" className="w-full h-10 rounded-md bg-flare-500 text-ink-950 font-semibold hover:bg-flare-400 text-sm mt-2">
+          <p className="text-2xs text-ink-400">
+            Roles control approval routing once the org has multiple users.
+            <span className="text-ink-300"> Owner</span> = full control;{' '}
+            <span className="text-ink-300">Strategist</span> = drafts + research;{' '}
+            <span className="text-ink-300">Operator</span> = generate + ship;{' '}
+            <span className="text-ink-300">Approver</span> = review-only.
+          </p>
+          <button type="submit" className="w-full h-11 rounded-md bg-flare-500 text-ink-950 font-semibold hover:bg-flare-400 text-sm mt-2">
             Create brand & open war room →
           </button>
         </form>

@@ -109,6 +109,17 @@ const OnboardInput = z.object({
   markets: z.string().max(200).optional(),
   riskTolerance: z.enum(['low', 'medium', 'high']).default('medium'),
   approvalMode: z.enum(['strict', 'moderate', 'fast']).default('moderate'),
+  // Role pick — drives the operator's membership.role on the new org.
+  // Only relevant when the user is creating their first brand (creates
+  // both the org and its membership). Default 'owner' preserves the
+  // legacy single-user-shop default.
+  role: z.enum(['owner', 'admin', 'strategist', 'operator', 'approver', 'viewer']).default('owner'),
+  // Tone capture (lighter-weight than the full BrandEditor surface).
+  // Comma-separated, parsed into JSON arrays. Operator can refine
+  // later from /brand.
+  bannedPhrases: z.string().max(400).optional(),
+  forbiddenStyles: z.string().max(400).optional(),
+  allowedJokes: z.string().max(400).optional(),
 });
 
 export async function createBrandAction(form: FormData): Promise<void> {
@@ -124,11 +135,35 @@ export async function createBrandAction(form: FormData): Promise<void> {
     markets: form.get('markets'),
     riskTolerance: form.get('riskTolerance') ?? 'medium',
     approvalMode: form.get('approvalMode') ?? 'moderate',
+    role: form.get('role') ?? 'owner',
+    bannedPhrases: form.get('bannedPhrases'),
+    forbiddenStyles: form.get('forbiddenStyles'),
+    allowedJokes: form.get('allowedJokes'),
   });
   if (!parsed.success) throw new Error('invalid_input');
 
   const competitors = (parsed.data.competitors ?? '').split(',').map(s => s.trim()).filter(Boolean);
   const markets = (parsed.data.markets ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  const splitCsv = (s?: string) => (s ?? '').split(',').map(v => v.trim()).filter(Boolean);
+  const bannedPhrases = splitCsv(parsed.data.bannedPhrases);
+  const forbiddenStyles = splitCsv(parsed.data.forbiddenStyles);
+  const allowedJokes = splitCsv(parsed.data.allowedJokes);
+
+  // Auto-suggest gtrends categories from the brand's free-text category.
+  // Operator can refine later via /brand → "Categories to ingest".
+  const { suggestCategoriesForBrand } = await import('@/lib/gtrends-categories');
+  const gtrendsCategories = suggestCategoriesForBrand(parsed.data.category, parsed.data.brandName);
+
+  // Update the user's membership role on this org. The auth signup path
+  // creates the membership with role='owner'; if the operator picked a
+  // different role here, persist it. Multi-user orgs can still grant
+  // owner via a separate admin flow later.
+  if (parsed.data.role !== 'owner') {
+    await prisma.membership.updateMany({
+      where: { userId: session.userId, orgId: session.orgId },
+      data: { role: parsed.data.role },
+    });
+  }
 
   const brand = await prisma.brand.create({
     data: {
@@ -144,15 +179,20 @@ export async function createBrandAction(form: FormData): Promise<void> {
       tone: JSON.stringify({
         voice: parsed.data.voice ?? 'Sharp. Direct. Confident.',
         tagline: parsed.data.tagline ?? '',
-        bannedPhrases: ['unleash your potential', 'best version of yourself', 'level up', 'redefine'],
-        allowedJokes: [],
-        forbiddenStyles: ['lifestyle warmth', 'motivational cliché'],
+        bannedPhrases: bannedPhrases.length > 0
+          ? bannedPhrases
+          : ['unleash your potential', 'best version of yourself', 'level up', 'redefine'],
+        allowedJokes,
+        forbiddenStyles: forbiddenStyles.length > 0
+          ? forbiddenStyles
+          : ['lifestyle warmth', 'motivational cliché'],
       }),
       bannedTopics: JSON.stringify(['politics', 'religion', 'tragedy']),
       // Seed brandKeywords with the brand name + a few common variants so
       // the user has SOMETHING in Brand Matches on day one. They'll add
       // product names + market suffixes via /brand later.
       brandKeywords: JSON.stringify(deriveDefaultBrandKeywords(parsed.data.brandName)),
+      gtrendsCategories: JSON.stringify(gtrendsCategories),
       safeThemes: JSON.stringify([parsed.data.category.toLowerCase()]),
       competitors: JSON.stringify(competitors),
       priorityPlatforms: JSON.stringify(['x', 'youtube', 'reddit', 'tiktok']),
