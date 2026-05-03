@@ -9,6 +9,7 @@ import { ScoreChip } from './ScoreChip';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { resolveSourceUrl } from '@/lib/source-link';
+import { displayLineage } from '@/lib/lineage-display';
 
 interface Props {
   trend: Trend;
@@ -188,7 +189,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           when not present, we fall back to the recommendationReason
           which already carries the brand-fit / risk explanation. Click
           opens the drawer with the Lineage tab pre-focused. */}
-      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5">{trend.lineage}</p>
+      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5">{displayLineage(trend.lineage)}</p>
       <p
         className="text-2xs text-flare-400/80 line-clamp-1 mb-1.5 italic"
         title={trend.recommendationReason}
