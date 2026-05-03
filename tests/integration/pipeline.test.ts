@@ -5,7 +5,7 @@
 // the COMPOSITION produces the right recommendations.
 
 import { describe, expect, it } from 'vitest';
-import { score } from '@/src/core/scoring';
+import { score, DEFAULT_JACKING_THRESHOLD, AUTO_VERIFY_THRESHOLD } from '@/src/core/scoring';
 import { POVA_BRAND } from '../fixtures/pova-brand';
 import {
   ALL_FIXTURES,
@@ -90,15 +90,17 @@ describe('full scoring pipeline — Brand-Trend Match regression', () => {
     const hot = score(BRAND_KEYWORD_HITS[2], { brand: POVA_BRAND }); // POVA Curve unboxing, v=400, r=200k
     expect(hot.jackingScore).toBeGreaterThanOrEqual(0.35);
 
-    // Competitor-only with modest velocity may pass the generation gate
-    // (operator should still see them on the board) but should NOT clear
-    // the auto-verify threshold (0.70) — those are reserved for trends
-    // we're confident enough in to burn premium-AI research dollars.
-    const cold = score(COMPETITOR_ONLY[3], { brand: POVA_BRAND }); // Realme buds review, v=100, r=40k
-    // Brand-fit is the relevant gate here: competitor-only trends have
-    // brandFit ≤0.55 by topical-fit construction, so CVS = (0.55 × VEL × FM × Sp)
-    // / drag — even with high velocity it should fall short of auto-verify.
-    expect(cold.jackingScore).toBeLessThan(0.70);
+    // A pure-noise trend with no brand anchor + low velocity should NOT
+    // clear the gate even if cringe/risk are clean (CVS multiplicative
+    // numerator collapses on weak FIT).
+    const noise = score(PURE_NOISE[0], { brand: POVA_BRAND }); // 'sinner' gtrends single-word
+    expect(noise.jackingScore).toBeLessThan(DEFAULT_JACKING_THRESHOLD);
+
+    // High-relevance trend with healthy velocity → clears the auto-verify
+    // gate. This is correct: we WANT to spend premium-AI research budget
+    // on hot, brand-relevant signals regardless of whether the brand or
+    // a competitor is named — competitor moves are jack-able too.
+    expect(hot.jackingScore).toBeGreaterThanOrEqual(AUTO_VERIFY_THRESHOLD);
   });
 });
 
