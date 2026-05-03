@@ -496,6 +496,8 @@ function rowToTrend(r: Awaited<ReturnType<typeof prisma.trend.findUnique>>): Tre
     predictedPeakConfidence: r.predictedPeakConfidence ?? undefined,
     cascadePhase: r.cascadePhase ?? undefined,
     calibrationBoost: r.calibrationBoost ?? undefined,
+    postEngagement: r.postEngagement != null ? Number(r.postEngagement) : undefined,
+    performanceMultiple: r.performanceMultiple ?? undefined,
     velocity: r.velocity,
     reach: Number(r.reach),
     sentiment: r.sentiment,
