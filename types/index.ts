@@ -17,7 +17,12 @@ export type Recommendation =
   | 'PREP_1H'
   | 'MONITOR'
   | 'IGNORE'
-  | 'ESCALATE';
+  | 'ESCALATE'
+  /** SAFE_PIVOT — high brand-fit + clean tone but high topical risk.
+   *  Engine flags trends like this for a non-direct angle: acknowledge
+   *  without engaging the controversy. The recommendationReason carries
+   *  a structured pivot suggestion (celebratory / positional / meta). */
+  | 'SAFE_PIVOT';
 
 export type ConnectorMode = 'live' | 'mock' | 'sim';
 

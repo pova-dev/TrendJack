@@ -68,6 +68,39 @@ export function decide(
   }
 
   // ---------------------------------------------------------------------
+  // Safe Pivot — high brand-fit + elevated risk + clean tone.
+  //
+  // The exact "high-fit + high-risk + clean tone" sweet spot the audit
+  // called out: an iQOO launch story (brand-relevant) with a lawsuit
+  // mention (risk 0.5-0.7) where direct engagement would be dilutive
+  // but ignoring it leaves money on the table. The pivot suggests an
+  // angle that acknowledges without engaging the controversy.
+  //
+  // The `pivotType` (celebratory / positional / meta) is heuristic at
+  // this layer — Phase 7's Resonance Agent picks a refined Hook from
+  // the Hook Library based on the brand persona vector.
+  // ---------------------------------------------------------------------
+  if (scores.brandFit >= 0.50 && scores.risk >= 0.50 && scores.risk < 0.70 && scores.cringe < 0.40) {
+    const pivotType =
+      // Sentiment hints toward the right pivot. Negative + high-risk →
+      // positional (take a stance that contrasts with the noise).
+      // Otherwise default to meta (acknowledge the conversation without
+      // engaging its specifics).
+      s.sentiment <= -0.3 ? 'positional'
+        : s.competitorClaimants.length === 1 ? 'celebratory'
+        : 'meta';
+    const angleHint = {
+      celebratory: 'celebrate the people / craft involved without engaging the controversy',
+      positional:  'take a defined stance that contrasts with the polarized noise',
+      meta:        'acknowledge that this conversation is happening without taking direct sides',
+    }[pivotType];
+    return {
+      recommendation: 'SAFE_PIVOT',
+      recommendationReason: `Brand-fit ${pct(scores.brandFit)} but risk ${pct(scores.risk)}. Pivot suggestion: ${pivotType} — ${angleHint}.`,
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // Opportunity-driven recommendation.
   // ---------------------------------------------------------------------
   if (scores.opportunity >= 75 && scores.timing > 0.6) {
