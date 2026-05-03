@@ -18,7 +18,7 @@ function defaultColumns() {
   // labelled "trending" alongside truly viral content.
   return [
     { id: 'col_pinned',        type: 'custom',              title: '📌 Pinned Watchlist', refreshSec:  60, filters: { pinnedOnly: true },                                                          sort: { key: 'firstSeenAt', dir: 'desc' } },
-    { id: 'col_brand_matches', type: 'brand_matches',       title: 'Brand Matches',       refreshSec:  60, filters: { brandKeywordOnly: true, bannedTopicSafe: true, maxRisk: 0.6 },             sort: { key: 'opportunity', dir: 'desc' } },
+    { id: 'col_brand_matches', type: 'brand_matches',       title: 'Brand Matches',       refreshSec:  60, filters: { brandKeywordOnly: true, bannedTopicSafe: true, maxRisk: 0.6, clusterSimilar: true, windowDays: 30 },             sort: { key: 'opportunity', dir: 'desc' } },
     { id: 'col_first_mover',   type: 'first_mover_window',  title: 'First-Mover Window',  refreshSec:  60, filters: { firstMoverOnly: true, minOpportunity: 20, minReach: 2000 },                 sort: { key: 'firstSeenAt', dir: 'desc' } },
     // Rising = peripheral awareness lane. Light velocity floor only —
     // reach is hard to compare across sources (Reddit upvotes vs YouTube
