@@ -44,15 +44,17 @@ export function Drawer({
       <aside
         role="dialog"
         aria-modal="true"
-        // Inline width is desktop-only — overridden by sm:max-w / mobile
-        // utilities below. We can't conditionally omit `style` because
-        // the value is computed from props, so we pass it always and let
-        // the mobile classes win via `sm:` reset of width.
-        style={{ width: typeof window !== 'undefined' && window.innerWidth >= 640 ? width : undefined }}
+        // Width is encoded as a CSS variable so SSR + client renders
+        // produce identical HTML (no `typeof window` branching). Mobile
+        // ignores the variable via `w-full` (left-0 right-0 stretches);
+        // desktop applies it via `sm:w-[var(--tj-drawer-width)]`.
+        style={{ '--tj-drawer-width': `${width}px` } as React.CSSProperties}
         className={cn(
-          // Desktop: side drawer, anchored right.
+          // Desktop: side drawer, anchored right, parameterized width.
           'sm:absolute sm:right-0 sm:top-0 sm:h-full sm:border-l sm:border-ink-700',
-          // Mobile: bottom-sheet pinned to the bottom edge.
+          'sm:w-[var(--tj-drawer-width)]',
+          // Mobile: bottom-sheet pinned to the bottom edge — full viewport
+          // width via left-0 right-0, height capped at 92vh.
           'absolute left-0 right-0 bottom-0 sm:left-auto h-[92vh] sm:h-full',
           // Visual + transition.
           'bg-ink-900 shadow-pop rounded-t-xl sm:rounded-none',
