@@ -42,6 +42,12 @@ export interface ScoredTrendMessage {
    *  migration window — adapters fall back to "no orgId" (Infinity quota)
    *  when this isn't present, which matches pre-budget behavior. */
   orgId?: string;
+  /** Brand's risk tolerance ('low' | 'medium' | 'high'). Threaded through
+   *  so the Verifier can set its claim-confidence floor per-brand:
+   *  conservative brands reject 0.5 confidence claims, aggressive brands
+   *  accept down to 0.2. Optional during migration — Verifier falls back
+   *  to the default 0.30 floor when unset. */
+  brandRiskTolerance?: string;
   fetchedAt: Date;
   /** Did the trend clear the Jacking Score threshold? Drives Verifier eligibility. */
   shouldVerify: boolean;

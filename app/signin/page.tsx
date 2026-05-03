@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { signinAction } from '@/lib/auth/actions';
+import { SubmitButton } from '@/components/auth/SubmitButton';
 
 export default function SigninPage() {
   return (
@@ -15,9 +16,7 @@ export default function SigninPage() {
         <form action={signinAction} className="space-y-3">
           <Field label="Email" name="email" type="email" required />
           <Field label="Password" name="password" type="password" required />
-          <button type="submit" className="w-full h-9 rounded-md bg-flare-500 text-ink-950 font-semibold hover:bg-flare-400 text-sm">
-            Sign in
-          </button>
+          <SubmitButton idleLabel="Sign in" busyLabel="Signing in…" />
         </form>
         <p className="mt-4 text-xs text-ink-400">
           New here? <Link href="/signup" className="text-flare-400 hover:underline">Create an account</Link>

@@ -9,7 +9,7 @@ interface Message { role: 'user' | 'ai'; text: string; provider?: string; model?
 const SUGGESTIONS = [
   'What should we post today?',
   'Which trends are too risky for our brand?',
-  'Find me a battery angle competitors haven\'t claimed.',
+  'Find an angle competitors haven\'t claimed yet.',
   'Summarize the top 3 first-mover opportunities.',
 ];
 

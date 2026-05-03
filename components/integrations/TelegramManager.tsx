@@ -61,7 +61,7 @@ export function TelegramManager({ initial }: { initial: TgConn[] }) {
         <h2 className="text-sm font-semibold text-ink-100">Telegram</h2>
         <p className="text-2xs text-ink-300">Get trend alerts pushed to a channel or DM. Create a bot via <span className="font-mono text-ink-200">@BotFather</span>, copy the token, find your chat ID via <span className="font-mono text-ink-200">@userinfobot</span> (DM) or by adding the bot to a group.</p>
       </header>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Field label="Name (optional)"><input value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="Default" /></Field>
         <Field label="Bot token"><input value={token} onChange={e => setToken(e.target.value)} className={inputCls} placeholder="123456:ABC-DEF…" type="password" /></Field>
         <Field label="Chat ID"><input value={chatId} onChange={e => setChatId(e.target.value)} className={inputCls} placeholder="-1001234567890 or 12345" /></Field>

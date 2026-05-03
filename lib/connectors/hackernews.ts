@@ -43,6 +43,12 @@ export class HackerNewsConnector implements Connector {
           const blob = (h.title + ' ' + (h.story_text ?? '')).toLowerCase();
           const competitorClaimants = [...competitorSet].filter(c => blob.includes(c));
 
+          // Velocity: real points-per-hour rate. No fabricated multiplier.
+          // (Previous code multiplied by 5 — that was hand-wavy and biased HN
+          // up vs other sources. Removed per CLAUDE.md rule 1.)
+          // Reach: HN does not expose impressions / views. Emit 0; UI renders '—'.
+          // (Previous code synthesized `points*50 + comments*10`, which was
+          // pure fabrication.)
           signals.push({
             source: 'news',
             title: h.title,
@@ -50,8 +56,8 @@ export class HackerNewsConnector implements Connector {
             hashtags: ['#HackerNews'],
             lineage: `Hit ${h.points ?? 0} pts on HN in ${ageHours.toFixed(1)}h. ${h.num_comments ?? 0} comments.`,
             firstSeenAt: new Date(createdMs),
-            velocity: (h.points ?? 0) / ageHours * 5,
-            reach: (h.points ?? 0) * 50 + (h.num_comments ?? 0) * 10,
+            velocity: (h.points ?? 0) / ageHours,
+            reach: 0,
             sentiment: 0.1,
             competitorClaimants,
             formatFatigue: 0.05,

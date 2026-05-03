@@ -152,7 +152,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
             <div className="space-y-3">
               <div>
                 <Label>Include — match if any of these appear</Label>
-                <ChipInput tone="good" value={keywordInclude} onChange={setKeywordInclude} placeholder="e.g. battery, gaming, thermal" />
+                <ChipInput tone="good" value={keywordInclude} onChange={setKeywordInclude} placeholder="keywords this column should match" />
               </div>
               <div>
                 <Label>Exclude — drop if any of these appear</Label>
@@ -160,7 +160,7 @@ export function ColumnBuilder({ open, onClose, onSave, initial }: Props) {
               </div>
               <div>
                 <Label>Hashtags (exact match)</Label>
-                <ChipInput tone="info" value={hashtags} onChange={setHashtags} placeholder="#GamingPhone, #BatteryLife" />
+                <ChipInput tone="info" value={hashtags} onChange={setHashtags} placeholder="#hashtag, #hashtag" />
               </div>
             </div>
           </Section>

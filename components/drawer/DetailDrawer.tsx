@@ -330,23 +330,27 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
           {tab === 'lineage'  && <LineageTab trend={trend} probe={lineage} loading={probingLineage} onProbe={handleLineage} />}
         </div>
 
-        <footer className="border-t border-ink-700 px-4 py-3 flex items-center gap-2 bg-ink-900">
+        {/* Footer compresses to size="sm" on mobile so 4 buttons fit
+            inside a 360px viewport without "Dismiss" pushing offscreen.
+            Round 3 audit P1: previously the size="md" buttons exceeded
+            viewport width and the ml-auto pin collapsed. */}
+        <footer className="border-t border-ink-700 px-3 sm:px-4 py-3 flex flex-wrap items-center gap-2 bg-ink-900">
           {trend.recommendation === 'POST_NOW' ? (
-            <Button variant="primary" size="md" onClick={() => handleGenerate(false)} disabled={generating}>
+            <Button variant="primary" size="sm" className="sm:h-11 sm:px-4 sm:text-sm" onClick={() => handleGenerate(false)} disabled={generating}>
               {generating ? 'Generating…' : 'Generate & ship'}
             </Button>
           ) : trend.recommendation === 'PREP_1H' ? (
-            <Button variant="primary" size="md" onClick={() => handleGenerate(false)} disabled={generating}>
+            <Button variant="primary" size="sm" className="sm:h-11 sm:px-4 sm:text-sm" onClick={() => handleGenerate(false)} disabled={generating}>
               {generating ? 'Generating…' : 'Draft for 1h window'}
             </Button>
           ) : (
-            <Button variant="subtle" size="md" onClick={() => handleGenerate(false)} disabled={generating}>
+            <Button variant="subtle" size="sm" className="sm:h-11 sm:px-4 sm:text-sm" onClick={() => handleGenerate(false)} disabled={generating}>
               {generating ? 'Generating…' : 'Generate anyway'}
             </Button>
           )}
-          <Button variant="outline" size="md" onClick={() => setTab('research')}>Research</Button>
-          <Button variant="ghost" size="md" onClick={() => onAction(trend.id, 'pin')}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
-          <Button variant="ghost" size="md" className="ml-auto text-ink-300 hover:text-signal-red" onClick={() => { onAction(trend.id, 'dismiss'); onClose(); }}>
+          <Button variant="outline" size="sm" className="sm:h-11 sm:px-4 sm:text-sm" onClick={() => setTab('research')}>Research</Button>
+          <Button variant="ghost" size="sm" className="sm:h-11 sm:px-4 sm:text-sm" onClick={() => onAction(trend.id, 'pin')}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
+          <Button variant="ghost" size="sm" className="ml-auto text-ink-300 hover:text-signal-red sm:h-11 sm:px-4 sm:text-sm" onClick={() => { onAction(trend.id, 'dismiss'); onClose(); }}>
             Dismiss
           </Button>
         </footer>

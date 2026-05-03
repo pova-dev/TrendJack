@@ -8,8 +8,13 @@
 //
 // We keep the map intentionally short — the most common 30 markets
 // for our buyer base. Anything unmatched falls through to the explicit
-// `gtrendsGeoOverride` (env / credential) and finally to 'IN' (the
-// reference brand's primary market).
+// `gtrendsGeoOverride` (env / credential) and finally to 'US' — chosen
+// because it's the largest English-speaking market and Google Trends'
+// most-populated dataset, so trends stay legible to any operator
+// regardless of their actual geo. (Round 3 cross-category audit caught
+// the previous 'IN' fallback silently surfacing India trends to Strider
+// (B2B SaaS, English-only). 'US' is a more honest "we don't know,
+// here's the best generic" default.)
 
 const MAP: Record<string, string> = {
   // Single-country names
@@ -73,12 +78,13 @@ export function countryToIso(name: string | undefined): string | undefined {
 }
 
 /** Pick the primary geo for a brand from its markets list. Resolves
- *  the first market string to an ISO code; falls back to 'IN' if no
- *  market is set or none resolve. */
+ *  the first market string to an ISO code; falls back to 'US' if no
+ *  market is set or none resolve. (Was 'IN' historically; that biased
+ *  every unconfigured tenant towards POVA's home market.) */
 export function primaryGeoForBrand(markets: string[] | undefined): string {
   for (const m of markets ?? []) {
     const iso = countryToIso(m);
     if (iso) return iso;
   }
-  return 'IN';
+  return 'US';
 }
