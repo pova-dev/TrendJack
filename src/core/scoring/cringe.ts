@@ -13,6 +13,7 @@
 import type { BrandProfile, RawSignal, ScoreRationale } from './types';
 import { matchStem } from './matchers';
 import { clamp01, pushRationale, round } from './helpers';
+import { detectForbiddenStyles } from './forbidden-styles';
 
 export const CLICHE_STEMS = [
   'unleash', 'limitless', 'dream big', 'best version', 'level up',
@@ -96,6 +97,18 @@ export function computeCringe(s: RawSignal, b: BrandProfile, r: ScoreRationale[]
   if (slangHits.length) {
     v += 0.25 * slangHits.length;
     reasons.push(`forced slang: ${slangHits.slice(0, 2).join(', ')}`);
+  }
+
+  // 5b. Brand-curated forbidden styles. Each style on the brand's
+  //     `tone.forbiddenStyles` list maps to a vocabulary in
+  //     forbidden-styles.ts. A doom-messaging-banned brand sees its
+  //     cringe lift on apocalyptic news; a lifestyle-warmth-banned
+  //     luxury brand sees it lift on "cozy magical journey" copy.
+  //     +0.20 per style hit, capped at +0.40.
+  const forbiddenHits = detectForbiddenStyles(blob, b.tone.forbiddenStyles ?? []);
+  if (forbiddenHits.length) {
+    v += Math.min(0.40, 0.20 * forbiddenHits.length);
+    reasons.push(`brand-forbidden style${forbiddenHits.length > 1 ? 's' : ''}: ${forbiddenHits.join(', ')}`);
   }
 
   // 6a. Exclamation density — !!!!! reads desperate. Use original-case text.

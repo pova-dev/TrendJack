@@ -6,6 +6,7 @@
 
 import type { BrandProfile, RawSignal, ScoreRationale } from './types';
 import { clamp01, pushRationale, round } from './helpers';
+import { detectForbiddenStyles } from './forbidden-styles';
 
 export function computeTonalFit(s: RawSignal, b: BrandProfile, r: ScoreRationale[]): number {
   const blob = (s.title + ' ' + s.summary + ' ' + (s.text ?? '')).toLowerCase();
@@ -20,10 +21,17 @@ export function computeTonalFit(s: RawSignal, b: BrandProfile, r: ScoreRationale
   const cliches = ['unleash', 'limitless', 'dream big', 'be the best version'];
   const clicheHits = cliches.filter(c => blob.includes(c)).length;
   if (clicheHits) v -= 0.25;
+  // Brand-curated forbidden styles. Per-style vocabulary lookup in
+  // forbidden-styles.ts. Drops fit by 0.15 per style hit (capped at 0.30).
+  const forbiddenHits = detectForbiddenStyles(blob, b.tone.forbiddenStyles ?? []);
+  if (forbiddenHits.length) {
+    v -= Math.min(0.30, 0.15 * forbiddenHits.length);
+  }
   v = clamp01(v);
   pushRationale(r, 'tonalFit', v, [
     hitsBanned.length ? `banned phrases: ${hitsBanned.join(', ')}` : 'no banned phrases',
     clicheHits ? `cliché triggers: ${clicheHits}` : 'no cliché triggers',
+    forbiddenHits.length ? `forbidden styles hit: ${forbiddenHits.join(', ')}` : 'no forbidden styles',
   ]);
   return round(v);
 }
