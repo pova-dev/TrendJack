@@ -103,6 +103,13 @@ export function computeTopicalFitDetailed(
   } else if (themeHits === 1) {
     v = 0.08;
     reason = `1 keyword match (${themeMatches[0]}) but no anchor — likely false positive`;
+  } else if (s.source === 'google_trends') {
+    // Peripheral-awareness floor for gtrends. The operator configured
+    // gtrends ingestion knowing items would lack brand-keyword anchor.
+    // Treat as low-but-not-rejected so it still surfaces in
+    // observerOnly columns + Trending Now.
+    v = 0.10;
+    reason = 'peripheral gtrends item — no brand anchor (expected for general trending)';
   } else {
     v = 0.05;
     reason = 'no theme or anchor';
