@@ -598,9 +598,17 @@ export async function persistScoredTrend(
   return { outcome: 'inserted', trendId: created.id };
 }
 
-/** Re-run forecastPeak() against a trend's TrendSample series and
- *  persist the result. Idempotent — safe to call on every persist tick.
- *  Returns silently when there isn't enough history to forecast. */
+/** Re-run forecastPeak() against a trend's TrendSample series, persist
+ *  the result, AND apply phase-aware recommendation downgrades.
+ *
+ *  Phase-aware rule (Phase B Phase 2 of Predictive Virality): when a
+ *  trend is decaying with high confidence (≥0.60), the action window
+ *  is closed — POST_NOW becomes a misleading recommendation. Downgrade
+ *  to MONITOR with a reason that names the phase + confidence so the
+ *  operator understands WHY the verdict moved.
+ *
+ *  Idempotent — safe to call on every persist tick. Returns silently
+ *  when there isn't enough history to forecast. */
 async function maybeWriteForecast(trendId: string): Promise<void> {
   const samples = await prisma.trendSample.findMany({
     where: { trendId },
@@ -618,12 +626,33 @@ async function maybeWriteForecast(trendId: string): Promise<void> {
     velocity: s.velocity,
     reach: Number(s.reach),
   })));
-  await prisma.trend.update({
-    where: { id: trendId },
-    data: {
-      predictedPeakAt: f.predictedPeakAt,
-      predictedPeakConfidence: f.predictedPeakConfidence,
-      cascadePhase: f.phase,
-    },
-  });
+
+  const updates: {
+    predictedPeakAt: Date | null;
+    predictedPeakConfidence: number | null;
+    cascadePhase: string;
+    recommendation?: string;
+    recommendationReason?: string;
+  } = {
+    predictedPeakAt: f.predictedPeakAt,
+    predictedPeakConfidence: f.predictedPeakConfidence,
+    cascadePhase: f.phase,
+  };
+
+  // Phase-aware downgrade. Only fires when:
+  //   - phase = 'decaying' AND
+  //   - confidence ≥ 0.60 (don't override based on a flaky 3-sample fit) AND
+  //   - current recommendation is action-tier (POST_NOW or PREP_1H)
+  if (f.phase === 'decaying' && f.predictedPeakConfidence >= 0.60) {
+    const current = await prisma.trend.findUnique({
+      where: { id: trendId },
+      select: { recommendation: true },
+    });
+    if (current && (current.recommendation === 'POST_NOW' || current.recommendation === 'PREP_1H')) {
+      updates.recommendation = 'MONITOR';
+      updates.recommendationReason = `Cascade decaying (${Math.round(f.predictedPeakConfidence * 100)}% confidence) — action window closed; downgraded from ${current.recommendation}.`;
+    }
+  }
+
+  await prisma.trend.update({ where: { id: trendId }, data: updates });
 }
