@@ -36,20 +36,9 @@ interface ResearchPayload {
 
 export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
   const [tab, setTab] = React.useState<TabKey>('overview');
-  const [draftsResult, setDraftsResult] = React.useState<{
-    drafts: unknown[];
-    mode?: 'live' | 'mock';
-    provider?: string;
-    model?: string;
-    tier?: string;
-    hadResearch?: boolean;
-    aiError?: string;
-    skip?: { reason: string; suggestion: string };
-    variantsChosen?: string[];
-    variantsSkipped?: { variant: string; reason: string }[];
-  } | null>(null);
+  const [draftsResult, setDraftsResult] = React.useState<DraftsResult | null>(null);
   const drafts = draftsResult?.drafts ?? null;
-  const setDrafts = (d: unknown[] | null) => setDraftsResult(d ? { drafts: d } : null);
+  const setDrafts = (d: AIDraft[] | null) => setDraftsResult(d ? { drafts: d } : null);
   const [generating, setGenerating] = React.useState(false);
   const [research, setResearch] = React.useState<ResearchPayload | null>(null);
   const [researching, setResearching] = React.useState(false);
@@ -320,8 +309,22 @@ function ScoresTab({ trend }: { trend: Trend }) {
   );
 }
 
+/** AI-produced draft. Field shapes vary slightly across model outputs so
+ *  every render-time access is wrapped in String()/Number() for safety. */
+interface AIDraft {
+  variant?: string;
+  platform?: string;
+  hook?: string;
+  body?: string;
+  cta?: string;
+  visualBrief?: string;
+  whyItWorks?: string;
+  whatNotToSay?: string;
+  cringeScore?: number;
+}
+
 interface DraftsResult {
-  drafts: unknown[];
+  drafts: AIDraft[];
   mode?: 'live' | 'mock';
   provider?: string;
   model?: string;
@@ -349,7 +352,7 @@ function DraftsTab({ result, generating, onGenerate }: {
     );
   }
 
-  const drafts = result.drafts as Array<Record<string, unknown>>;
+  const drafts: AIDraft[] = result.drafts;
 
   return (
     <div className="space-y-3">

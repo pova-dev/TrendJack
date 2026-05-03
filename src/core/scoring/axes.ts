@@ -102,14 +102,17 @@ export function estimateProductionEffort(s: RawSignal, r: ScoreRationale[]): num
 // the dashboard before an operator can see them.
 
 export function predictPeakWindowEnd(s: RawSignal): Date {
-  const halfLifeHours = {
+  const halfLifeHours: Record<typeof s.source, number> = {
     x: 6,
     reddit: 18,
     youtube: 36,
     tiktok: 24,
+    instagram: 24,
+    facebook: 24,
     google_trends: 72,
     news: 24,           // bumped from 8h — articles still rank for 24-48h
     custom: 18,
-  }[s.source] ?? 18;
-  return new Date(s.firstSeenAt.getTime() + halfLifeHours * 60 * 60 * 1000);
+  };
+  const hours = halfLifeHours[s.source] ?? 18;
+  return new Date(s.firstSeenAt.getTime() + hours * 60 * 60 * 1000);
 }

@@ -123,7 +123,9 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
               {delta! > 0 ? '▲' : '▼'} {Math.abs(Math.round(delta! * 100))}%
             </Chip>
           )}
-          <span className={cn('font-mono', peak.expired ? 'text-ink-500' : 'text-ink-300')}>⏱ {peak.label}</span>
+          <span className={cn('font-mono', typeof peak === 'object' && peak.expired ? 'text-ink-500' : 'text-ink-300')}>
+            ⏱ {typeof peak === 'object' ? peak.label : peak}
+          </span>
         </span>
       </header>
 
