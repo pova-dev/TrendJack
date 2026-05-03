@@ -13,6 +13,28 @@ import { formatBig, relTime, timeUntil, pct } from '@/lib/utils';
 import { resolveSourceUrl } from '@/lib/source-link';
 import { Sparkline } from '@/components/trend/Sparkline';
 
+// Static display data for the Hook Library + Templates picker. Mirrors
+// what's in src/agents/creative/hooks.ts and templates.ts but inlined
+// here so this client component doesn't pull in the agent layer's
+// server-only deps.
+const HOOK_LIBRARY_DISPLAY = [
+  { id: 'challenger',      label: 'Challenger',     risk: 'edgy',  angle: 'Brand does the opposite of the trend, and wins by it.' },
+  { id: 'educator',        label: 'Educator',       risk: 'safe',  angle: 'The tech / story behind the trend, explained simply.' },
+  { id: 'comedian',        label: 'Comedian',       risk: 'edgy',  angle: 'Self-aware, anti-marketing wit. Cringe must be low.' },
+  { id: 'expert_reaction', label: 'Expert',         risk: 'safe',  angle: "Here's what we'd actually do — and why." },
+  { id: 'told_you_so',     label: 'Told You So',    risk: 'edgy',  angle: "Trend proves the brand's prior thesis." },
+  { id: 'meta_observer',   label: 'Meta Observer',  risk: 'safe',  angle: 'Acknowledge without engaging the controversy.' },
+  { id: 'positional',      label: 'Positional',     risk: 'spicy', angle: 'Take a stance contrasting the polarized noise.' },
+] as const;
+
+const TEMPLATE_DISPLAY = [
+  { id: 'x-thread-3',       label: 'X Thread (3)' },
+  { id: 'x-single',         label: 'X Single' },
+  { id: 'ig-carousel-5',    label: 'IG Carousel (5)' },
+  { id: 'tiktok-script-30s',label: 'TikTok 30s' },
+  { id: 'linkedin-200w',    label: 'LinkedIn ~200w' },
+] as const;
+
 interface Props {
   trend: Trend | null;
   open: boolean;
@@ -343,11 +365,51 @@ function DraftsTab({ result, generating, onGenerate }: {
 }) {
   if (!result) {
     return (
-      <div className="text-center py-8">
-        <p className="text-ink-300 mb-3">No drafts yet. Click below — the AI picks which variants fit this trend (skipping meme for hard news, etc.) and produces drafts grounded in the trend + cached research.</p>
-        <Button variant="primary" onClick={() => onGenerate(false)} disabled={generating}>
-          {generating ? 'Generating…' : '✦ Generate drafts'}
-        </Button>
+      <div className="space-y-4 py-2">
+        <div className="text-ink-300 text-xs">
+          Drafts compose from a <span className="text-ink-100">Template</span> (channel structure)
+          + <span className="text-ink-100">Hook</span> (psychological angle) + <span className="text-ink-100">Context</span> (verified
+          claims + brand voice). The AI picks the best combo for this trend; the picker below shows
+          what's available.
+        </div>
+
+        <div>
+          <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300 mb-2">Hook Library</h4>
+          <div className="grid grid-cols-2 gap-1.5">
+            {HOOK_LIBRARY_DISPLAY.map(h => (
+              <div key={h.id} className="rounded-md border border-ink-700 bg-ink-800/40 p-2">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xs font-semibold text-ink-100">{h.label}</span>
+                  <Chip tone={h.risk === 'spicy' ? 'bad' : h.risk === 'edgy' ? 'warn' : 'good'}>
+                    {h.risk}
+                  </Chip>
+                </div>
+                <p className="text-2xs text-ink-300 mt-0.5 leading-snug">{h.angle}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-2xs font-mono uppercase tracking-wider text-ink-300 mb-2">Templates</h4>
+          <div className="flex flex-wrap gap-1.5">
+            {TEMPLATE_DISPLAY.map(t => (
+              <Chip key={t.id} tone="info" title={t.label}>
+                {t.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-ink-700">
+          <Button variant="primary" onClick={() => onGenerate(false)} disabled={generating} className="w-full">
+            {generating ? 'Generating…' : '✦ Generate drafts'}
+          </Button>
+          <p className="text-2xs text-ink-400 mt-1.5 text-center">
+            AI picks 1–3 (template, hook) variants based on this trend's recommendation
+            and your brand's voice fit.
+          </p>
+        </div>
       </div>
     );
   }
