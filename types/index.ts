@@ -90,6 +90,11 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
 
 export interface BrandProfile {
   id: string;
+  /** Owning org id. Optional for legacy fixtures that pre-date the
+   *  multi-tenant migration; runtime-loaded brands always set it. The
+   *  Filter Agent uses it to attach orgId to ScoredTrendMessage so
+   *  downstream LLM calls can be budget-gated per org. */
+  orgId?: string;
   name: string;
   category: string;
   markets: string[];
@@ -111,6 +116,10 @@ export interface BrandProfile {
    *  substring match). Examples for POVA: ['pova', 'tecno pova',
    *  'pova curve', 'pova 7', 'tecno']. */
   brandKeywords: string[];
+  /** Google Trends category ids the brand wants ingested. Drives per-
+   *  category fan-out in the Google Trends connector. Empty = top stories
+   *  (legacy default). See prisma/schema.prisma comment for the id table. */
+  gtrendsCategories?: string[];
   safeThemes: string[];
   competitors: string[];
   priorityPlatforms: SourceId[] | string[];
@@ -284,6 +293,12 @@ export interface ColumnFilters {
   /** When true, only trends with `pinned=true` show. Used by the
    *  Pinned Watchlist column for long-running tracked items. */
   pinnedOnly?: boolean;
+  /** Google Trends category id filter (single). When set, only signals
+   *  whose lineage starts with `[cat:<id>]` show. Use 'top' for top-stories,
+   *  't' / 'b' / 'e' / 'm' / 'h' for the per-category fan-out. Defaults
+   *  to undefined = no category filter, show all gtrends signals.
+   *  Only meaningful when filters.sources includes 'google_trends'. */
+  gtrendsCategory?: string;
 }
 
 export interface BoardConfig {

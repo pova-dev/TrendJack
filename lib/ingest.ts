@@ -8,6 +8,7 @@ import { prisma } from './db';
 import { score, type RawSignal } from '@/lib/scoring/engine';
 import { getBrand } from './store';
 import { getOrgCredentials } from './credentials';
+import { primaryGeoForBrand } from './countries';
 import { RedditLiveConnector } from './connectors/reddit';
 import { HackerNewsConnector } from './connectors/hackernews';
 import { GoogleNewsConnector } from './connectors/googlenews';
@@ -54,6 +55,17 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
   // The Scout returns RawSignals already deduplicated within a single tick;
   // the persistence loop below still uses externalId-based DB dedup so
   // historical entries (from prior ticks) don't get duplicated either.
+  // Brand-scoped Google Trends category fan-out. When empty, the
+  // connector defaults to top stories (legacy behavior).
+  const gtrendsCategories = (brand.gtrendsCategories ?? []).filter(Boolean);
+
+  // Resolve Google Trends geo from the brand's markets list, with env
+  // / credential override for cases where the operator wants to track a
+  // market they don't sell in. brand.markets[0] is the primary market.
+  const geo = process.env.GTRENDS_GEO
+    || credentials.GTRENDS_GEO
+    || primaryGeoForBrand(brand.markets);
+
   const scoutReport = await runScout(
     {
       brandId,
@@ -63,6 +75,8 @@ export async function ingestForBrand(brandId: string, orgId?: string): Promise<I
       themes,
       since,
       credentials,
+      gtrendsCategories,
+      geo,
     },
     {
       connectors: [

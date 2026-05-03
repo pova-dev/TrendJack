@@ -215,6 +215,15 @@ export function applyColumnFilter(
       const has = f.subreddits.some(s => blob.includes('r/' + s.toLowerCase()));
       if (!has) return false;
     }
+    // Google Trends category filter — only meaningful when this column's
+    // sources include google_trends. The connector tags lineage with a
+    // `[cat:<id>]` prefix per fan-out fetch; we substring-match here so
+    // legacy rows (no tag, ingested before fan-out shipped) still pass
+    // unfiltered to avoid breaking existing columns.
+    if (f.gtrendsCategory && t.source === 'google_trends') {
+      const tag = `[cat:${f.gtrendsCategory}]`;
+      if (!t.lineage.startsWith(tag)) return false;
+    }
     if (typeof f.windowHours === 'number') {
       const ageHours = (Date.now() - new Date(t.firstSeenAt).getTime()) / 3_600_000;
       if (ageHours > f.windowHours) return false;

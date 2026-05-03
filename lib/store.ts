@@ -51,6 +51,7 @@ export async function updateBrand(brandId: string, patch: BrandPatch): Promise<B
   if ('tone' in patch) data.tone = JSON.stringify(patch.tone ?? {});
   if ('bannedTopics' in patch) data.bannedTopics = JSON.stringify(patch.bannedTopics ?? []);
   if ('brandKeywords' in patch) data.brandKeywords = JSON.stringify(patch.brandKeywords ?? []);
+  if ('gtrendsCategories' in patch) data.gtrendsCategories = JSON.stringify(patch.gtrendsCategories ?? []);
   if ('safeThemes' in patch) data.safeThemes = JSON.stringify(patch.safeThemes ?? []);
   if ('competitors' in patch) data.competitors = JSON.stringify(patch.competitors ?? []);
   if ('priorityPlatforms' in patch) data.priorityPlatforms = JSON.stringify(patch.priorityPlatforms ?? []);
@@ -390,6 +391,7 @@ function rowToBrand(b: Awaited<ReturnType<typeof prisma.brand.findUnique>>): Bra
   if (!b) throw new Error('null brand row');
   return {
     id: b.id,
+    orgId: b.orgId,
     name: b.name,
     category: b.category,
     markets: parseJSON(b.markets, [] as string[]),
@@ -397,6 +399,7 @@ function rowToBrand(b: Awaited<ReturnType<typeof prisma.brand.findUnique>>): Bra
     tone: parseJSON(b.tone, { voice: '', tagline: '', bannedPhrases: [], allowedJokes: [], forbiddenStyles: [] }) as BrandProfile['tone'],
     bannedTopics: parseJSON(b.bannedTopics, [] as string[]),
     brandKeywords: parseJSON(b.brandKeywords ?? '[]', [] as string[]),
+    gtrendsCategories: parseJSON(b.gtrendsCategories ?? '[]', [] as string[]),
     safeThemes: parseJSON(b.safeThemes, [] as string[]),
     competitors: parseJSON(b.competitors, [] as string[]),
     priorityPlatforms: parseJSON(b.priorityPlatforms, [] as string[]),

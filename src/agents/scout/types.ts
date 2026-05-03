@@ -24,6 +24,13 @@ export interface ScoutContext {
   since: Date;
   /** Per-org credential bag (X bearer token, Reddit UA, YouTube key, etc). */
   credentials: Record<string, string>;
+  /** Google Trends category fan-out, set per-brand. The Google Trends
+   *  connector splits one fetch per category and tags signals so columns
+   *  can filter by category. Empty array = top stories (legacy default). */
+  gtrendsCategories?: string[];
+  /** Default geography for connectors that support it (Google Trends).
+   *  ISO country code (e.g. 'IN' for India). */
+  geo?: string;
 }
 
 export interface ScoutPollOutcome {
@@ -70,6 +77,8 @@ export function connectorFn(c: Connector): ConnectorFn {
       themes: ctx.themes,
       limit: 50,
       credentials: ctx.credentials,
+      gtrendsCategories: ctx.gtrendsCategories,
+      geo: ctx.geo,
     });
     if (result.ok) {
       return { ok: true, signals: result.signals };

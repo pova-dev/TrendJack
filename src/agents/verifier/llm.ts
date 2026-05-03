@@ -57,7 +57,7 @@ interface VerifierResponse {
 
 export function makeLlmVerifier(opts: { credentials?: OrgCredentials } = {}): VerifierAdapter {
   return {
-    async verify({ signal }) {
+    async verify({ signal, orgId }) {
       const sources: Array<{ title?: string; url?: string }> = [
         ...(signal.examples ?? []).map(e => ({ title: e.author, url: e.url })),
         ...(signal.url ? [{ title: signal.title, url: signal.url }] : []),
@@ -85,11 +85,18 @@ Return STRICT JSON only.`;
         temperature: 0.2,  // factual extraction — low temp
         jsonMode: true,
         credentials: opts.credentials,
+        orgId,
       });
 
       if (!ai.ok) {
+        // 'budget_exhausted' is expected when an org hits its daily cap;
+        // the dashboard can surface it as a soft warning instead of a
+        // failure. Other errors (network, model errors) flow through.
+        const summary = ai.error === 'budget_exhausted'
+          ? 'Verifier skipped — daily AI budget for this org is exhausted.'
+          : `Verifier could not run (${ai.error ?? 'unknown'}). No claims extracted.`;
         return {
-          summary: `Verifier could not run (${ai.error ?? 'unknown'}). No claims extracted.`,
+          summary,
           claims: [],
           unverifiedClaims: [],
           provider: ai.provider ?? 'none',

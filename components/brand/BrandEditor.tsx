@@ -108,6 +108,47 @@ export function BrandEditor({ initial }: Props) {
         </div>
 
         <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
+          <h2 className="text-sm font-semibold text-ink-100 mb-2">Google Trends</h2>
+          <p className="text-2xs text-ink-300 mb-3">
+            Drives the <span className="font-mono text-flare-400">Trending Now</span> column. The first <span className="font-mono">market</span> above
+            sets the geo (so India / SEA / US…). Pick the categories you actually care about — too many fans out a lot of fetches.
+          </p>
+          <Field label="Categories to ingest">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'top', label: 'Top stories' },
+                { id: 't',   label: 'Sports' },
+                { id: 'b',   label: 'Business' },
+                { id: 'e',   label: 'Entertainment' },
+                { id: 'm',   label: 'Sci & Tech' },
+                { id: 'h',   label: 'Health' },
+              ].map(cat => {
+                const active = (brand.gtrendsCategories ?? []).includes(cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      const cur = new Set(brand.gtrendsCategories ?? []);
+                      if (cur.has(cat.id)) cur.delete(cat.id); else cur.add(cat.id);
+                      void patchAndSave({ gtrendsCategories: Array.from(cur) });
+                    }}
+                    className={
+                      'rounded-md border px-3 py-1 text-xs transition ' +
+                      (active
+                        ? 'border-flare-500 bg-flare-500/15 text-flare-200'
+                        : 'border-ink-700 bg-ink-800 text-ink-300 hover:text-ink-100')
+                    }
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </div>
+
+        <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
           <h2 className="text-sm font-semibold text-ink-100 mb-2">Topics</h2>
           <Field label="Banned topics — hard kill on trends that mention these">
             <ChipInput tone="bad" value={brand.bannedTopics} onChange={v => patchAndSave({ bannedTopics: v })} placeholder="politics, religion, tragedy…" />

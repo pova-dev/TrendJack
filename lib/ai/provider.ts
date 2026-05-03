@@ -24,6 +24,7 @@
 //   TJ_PROVIDER_BALANCED=openai  TJ_MODEL_BALANCED=gpt-4o-mini
 
 import { pickCred, type OrgCredentials } from '@/lib/credentials';
+import { isOverBudget, recordCost, estimateCostUsd, remainingBudget } from './budget';
 
 export type AiTier = 'cheap' | 'balanced' | 'premium';
 export type AiProvider = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'none';
@@ -42,6 +43,11 @@ export interface AiRunOptions {
   jsonMode?: boolean;
   /** Org-level credential bag from getOrgCredentials() — preferred over env */
   credentials?: OrgCredentials;
+  /** Org id used by the budget tracker. When set, runChat refuses to dispatch
+   *  if the org's daily cap (TJ_AI_BUDGET_DAILY_USD or per-org override) is
+   *  exhausted, and records the cost on success. Pass undefined for system-
+   *  level calls that shouldn't count against any org's quota. */
+  orgId?: string;
 }
 
 export interface AiResult {
@@ -106,11 +112,37 @@ export async function runChat(opts: AiRunOptions): Promise<AiResponse> {
 
   if (provider === 'none') return { ok: false, error: 'no_ai_key', provider: 'none' };
 
-  if (provider === 'anthropic')  return callAnthropic(model, opts);
-  if (provider === 'openai')     return callOpenAI(model, opts);
-  if (provider === 'google')     return callGoogle(model, opts);
-  if (provider === 'openrouter') return callOpenRouter(model, opts);
-  return { ok: false, error: 'unknown_provider', provider };
+  // Architect-managed budget gate. We refuse the call when the org has
+  // already hit its daily USD cap. The error is structured so callers
+  // (Verifier / draft-gen) can degrade gracefully — e.g. fall back to
+  // the stub verifier or skip premium-tier drafts — instead of bubbling
+  // a fetch error that looks like an outage.
+  if (opts.orgId && isOverBudget(opts.orgId)) {
+    return { ok: false, error: 'budget_exhausted', provider };
+  }
+
+  let res: AiResponse;
+  if (provider === 'anthropic')       res = await callAnthropic(model, opts);
+  else if (provider === 'openai')     res = await callOpenAI(model, opts);
+  else if (provider === 'google')     res = await callGoogle(model, opts);
+  else if (provider === 'openrouter') res = await callOpenRouter(model, opts);
+  else return { ok: false, error: 'unknown_provider', provider };
+
+  // Record cost on successful calls. Token counts come back from each
+  // provider's usage block — providers that don't return one (rare) will
+  // contribute zero cost, which under-counts but never over-counts.
+  if (res.ok && opts.orgId) {
+    const cost = estimateCostUsd(res.model, res.inputTokens, res.outputTokens);
+    if (cost > 0) recordCost(opts.orgId, cost);
+  }
+
+  return res;
+}
+
+/** Telemetry helper — exposed so the Architect / dashboard can show
+ *  remaining-budget without re-importing the budget module. */
+export function getRemainingBudgetUsd(orgId: string | undefined): number {
+  return remainingBudget(orgId);
 }
 
 async function callAnthropic(model: string, opts: AiRunOptions): Promise<AiResponse> {

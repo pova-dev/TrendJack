@@ -98,6 +98,10 @@ export function startFilterAgent(deps: FilterAgentDeps): FilterAgentHandle {
           signal: body.signal,
           scoreResult,
           brandId: body.brandId,
+          // Budget-gate downstream Verifier / Creative LLM calls by org.
+          // We pass undefined if the loaded brand somehow lacks orgId so
+          // the budget tracker treats it as "no quota" (Infinity).
+          orgId: brand.orgId,
           fetchedAt: body.fetchedAt,
           shouldVerify: scoreResult.jackingScore >= AUTO_VERIFY_THRESHOLD,
         });

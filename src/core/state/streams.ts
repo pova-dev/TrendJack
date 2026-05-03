@@ -37,6 +37,11 @@ export interface ScoredTrendMessage {
   signal: RawSignal;
   scoreResult: ScoreResult;
   brandId: string;
+  /** Org id resolved from brand. Used by the Verifier Agent to budget-gate
+   *  premium-AI calls per org via lib/ai/budget. Optional during the
+   *  migration window — adapters fall back to "no orgId" (Infinity quota)
+   *  when this isn't present, which matches pre-budget behavior. */
+  orgId?: string;
   fetchedAt: Date;
   /** Did the trend clear the Jacking Score threshold? Drives Verifier eligibility. */
   shouldVerify: boolean;
