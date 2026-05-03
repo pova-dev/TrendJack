@@ -98,14 +98,18 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     weights.effort * effort;
   const opportunity = Math.round(clamp01(raw) * 100);
 
-  // --- Jacking Score (multiplicative, drives content-gen trigger) ---------
-  // JS = (V × R) / D where V=virality, R=brandFit, D=effort.
-  // Used by the Filter Agent to decide whether to fire the Creative Agent.
-  // Lives alongside opportunity, NOT in place of it.
+  // --- Jacking Score / S_max (canonical signal strength) ------------------
+  // S_max = (FIT × VEL × FM) / (RISK + CRINGE + SAT)
+  // Drives the Creative Agent's go/no-go gate AND the Verifier auto-fire
+  // threshold. Lives alongside `opportunity` (additive composite for
+  // dashboard ranking).
   const jackingScore = computeJackingScore({
+    fit: brandFit,
     velocity: virality,
-    relevance: brandFit,
-    difficulty: effort,
+    firstMover,
+    risk,
+    cringe,
+    saturation,
   });
 
   const scores: Scores = {
