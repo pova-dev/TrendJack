@@ -3,7 +3,7 @@ import * as React from 'react';
 import type { BoardConfig, ColumnConfig, Trend } from '@/types';
 import { BoardColumn } from './BoardColumn';
 import { DetailDrawer } from '@/components/drawer/DetailDrawer';
-import { applyColumnFilter } from '@/lib/columns';
+import { applyColumnFilter, assignTrendsToColumns } from '@/lib/columns';
 import { useBoardStream } from '@/lib/realtime/use-board-stream';
 import { ColumnBuilder } from './ColumnBuilder';
 
@@ -150,6 +150,15 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
     return () => window.removeEventListener('tj:add-column', handler);
   }, []);
 
+  // Cross-column priority assignment — each trend appears in exactly ONE
+  // column (its highest-priority match). Computed once per render against
+  // the current trends list; columns render in user's configured order
+  // but the claim phase iterates by priority.
+  const columnAssignments = React.useMemo(
+    () => assignTrendsToColumns(board.columns, trends),
+    [board.columns, trends],
+  );
+
   return (
     <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden bg-ink-900">
       {board.columns.map((col, idx) => (
@@ -165,7 +174,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           >
             <BoardColumn
               column={col}
-              trends={applyColumnFilter(col, trends)}
+              trends={columnAssignments.get(col.id) ?? []}
               activeTrendId={activeId}
               lastTickAt={tickAt}
               dragging={dragColId === col.id}
