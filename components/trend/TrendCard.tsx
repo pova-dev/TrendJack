@@ -252,13 +252,19 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
       )}
 
       {/* row 6 — actions.
-       *  Mobile: always visible (no hover state on touch), `sm` size for
-       *    bigger touch targets (h-9, ~36px) — close to the iOS HIG 44pt
-       *    floor without breaking desktop density.
-       *  Desktop: hover-revealed compact (xs, h-6 ~24px). */}
+       *  Mobile: always visible at full opacity, full-size buttons (Button
+       *    component sizes mobile to h-11 = HIG 44pt floor).
+       *  Desktop: low-opacity by default, full opacity on group-hover OR
+       *    when any action button has keyboard focus (group-focus-within).
+       *    Per Visual Auditor §D: keyboard users can now tab into the
+       *    actions and they reveal — previously focus-within never fired
+       *    because the article's tabIndex landed focus on the wrapper,
+       *    not inside the action row. tabIndex=-1 on the article (below)
+       *    + keyboard arrow handlers in Board.tsx still work because the
+       *    Board manages selection at its level, not via per-card focus. */}
       <div className={cn(
-        'flex items-center gap-1 transition-opacity',
-        'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
+        'flex items-center gap-1 motion-safe:transition-opacity',
+        'sm:opacity-60 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
       )}>
         <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
         <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'save'); }}>Save</Button>
@@ -268,12 +274,14 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           target="_blank"
           rel="noreferrer noopener"
           onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 h-9 sm:h-6 px-3 sm:px-2 rounded-md text-xs sm:text-2xs font-medium text-ink-200 hover:bg-ink-700"
+          className="inline-flex items-center gap-1 h-11 sm:h-6 px-3 sm:px-2 rounded-md text-sm sm:text-2xs font-medium text-ink-200 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+          aria-label={trend.url ? `Open ${trend.title} on ${sourceLabel(trend.source)}` : `Search ${sourceLabel(trend.source)} for ${trend.title}`}
           title={trend.url ? 'Open original (O)' : `Search ${sourceLabel(trend.source)} for this (O)`}
         >
           {trend.url ? 'Open ↗' : 'Search ↗'}
         </a>
         <Button size="xs" variant="ghost" className="ml-auto text-ink-400 hover:text-signal-red"
+          aria-label={`Dismiss ${trend.title}`}
           onClick={e => { e.stopPropagation(); onAction(trend.id, 'dismiss'); }}>Dismiss</Button>
       </div>
     </article>
