@@ -125,7 +125,11 @@ export function BoardColumn({
   return (
     <section
       className={cn(
-        'flex flex-col flex-shrink-0 w-[360px] h-[calc(100%-12px)] my-1.5 mx-1 rounded-xl bg-ink-850 border border-ink-700/60 shadow-col overflow-hidden transition-opacity',
+        // Mobile (<sm): column fills the viewport minus the LeftRail
+        //   (60px) and a small breathing margin (8px = 4px each side
+        //   from mx-1). On a 390px iPhone this gives a 322px column.
+        // Desktop (≥sm): fixed 360px so multiple columns fit on screen.
+        'flex flex-col flex-shrink-0 w-[calc(100vw-72px)] sm:w-[360px] h-[calc(100%-12px)] my-1.5 mx-1 rounded-xl bg-ink-850 border border-ink-700/60 shadow-col overflow-hidden transition-opacity',
         dragging && 'opacity-40 ring-1 ring-flare-500',
       )}
       aria-label={column.title}
