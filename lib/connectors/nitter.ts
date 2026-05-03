@@ -92,7 +92,12 @@ export class NitterConnector implements Connector {
               lineage: `Nitter via ${new URL(base).hostname}; ${ageHours.toFixed(1)}h ago.`,
               firstSeenAt: pub,
               velocity: 60 / ageHours,
-              reach: 5_000 / Math.max(1, ageHours),
+              // Nitter RSS doesn't expose impression / view counts — Twitter
+              // strips them from the public timeline. We previously fabricated
+              // 5_000/ageHours which made every card show a fake reach number.
+              // Ship 0 → UI renders "—". Set X_BEARER_TOKEN to use the
+              // official X v2 connector with real public_metrics.
+              reach: 0,
               sentiment: 0,
               competitorClaimants,
               formatFatigue: 0.05,

@@ -63,8 +63,16 @@ export class GoogleNewsConnector implements Connector {
             hashtags: ['#News'],
             lineage: `${sourceLabel} · published ${ageHours.toFixed(1)}h ago for query "${q}".`,
             firstSeenAt: pub,
+            // Velocity proxy: news that just published has higher publishing
+            // momentum than 12h-old news. Bounded; not an engagement metric.
             velocity: 60 / ageHours,
-            reach: 50_000 / Math.max(1, ageHours),
+            // Google News RSS does NOT expose reach. Previous code fabricated
+            // a number (50_000 / ageHours) which made every news card show
+            // a plausible-looking but completely fake "50.0K reach". Ship 0
+            // — the UI renders "—" so we don't lie about engagement we
+            // don't have. Set `YOUTUBE_API_KEY` / X bearer / paid news APIs
+            // for sources with real reach data.
+            reach: 0,
             sentiment: 0,
             competitorClaimants,
             formatFatigue: 0.05,

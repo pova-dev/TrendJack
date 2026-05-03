@@ -73,7 +73,10 @@ export class RsshubConnector implements Connector {
             lineage: `RSSHub feed ${path}; ${ageHours.toFixed(1)}h ago.`,
             firstSeenAt: pub,
             velocity: 30 / ageHours,
-            reach: 5_000 / Math.max(1, ageHours),
+            // RSSHub feeds don't expose engagement metrics. Previously
+            // fabricated 5_000/ageHours; we now emit 0 (UI renders "—")
+            // rather than show a synthetic number that looks real.
+            reach: 0,
             sentiment: 0,
             competitorClaimants,
             formatFatigue: 0.05,
