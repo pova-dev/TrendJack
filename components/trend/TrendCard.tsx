@@ -225,20 +225,24 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         </div>
       )}
 
-      {/* row 6 — actions */}
+      {/* row 6 — actions.
+       *  Mobile: always visible (no hover state on touch), `sm` size for
+       *    bigger touch targets (h-9, ~36px) — close to the iOS HIG 44pt
+       *    floor without breaking desktop density.
+       *  Desktop: hover-revealed compact (xs, h-6 ~24px). */}
       <div className={cn(
         'flex items-center gap-1 transition-opacity',
-        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+        'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
       )}>
-        <Button size="xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
-        <Button size="xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'save'); }}>Save</Button>
-        <Button size="xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'pin'); }}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
+        <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
+        <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'save'); }}>Save</Button>
+        <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'pin'); }}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
         <a
           href={resolveSourceUrl(trend)}
           target="_blank"
           rel="noreferrer noopener"
           onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-2xs font-medium text-ink-200 hover:bg-ink-700"
+          className="inline-flex items-center gap-1 h-9 sm:h-6 px-3 sm:px-2 rounded-md text-xs sm:text-2xs font-medium text-ink-200 hover:bg-ink-700"
           title={trend.url ? 'Open original (O)' : `Search ${sourceLabel(trend.source)} for this (O)`}
         >
           {trend.url ? 'Open ↗' : 'Search ↗'}

@@ -159,8 +159,12 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
     [board.columns, trends],
   );
 
+  // Board scroll container.
+  //   Mobile (<sm): columns are full-screen-width with scroll-snap so
+  //   swiping moves between exactly one column at a time.
+  //   Desktop (≥sm): traditional horizontal scroll, multiple columns visible.
   return (
-    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden bg-ink-900">
+    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden bg-ink-900 snap-x snap-mandatory sm:snap-none">
       {board.columns.map((col, idx) => (
         <React.Fragment key={col.id}>
           {/* Drop slot before this column */}
@@ -170,7 +174,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           <div
             onDragOver={dragColId ? e => onDragOverIdx(idx + 1, e) : undefined}
             onDrop={dragColId ? () => onDrop(idx + 1) : undefined}
-            className="flex-shrink-0"
+            className="flex-shrink-0 snap-start sm:snap-align-none"
           >
             <BoardColumn
               column={col}
