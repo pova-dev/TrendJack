@@ -12,6 +12,7 @@ export type ColumnSortKey =
   | 'volume'        // highest velocity first
   | 'reach'         // highest reach first
   | 'opportunity'   // highest opportunity score
+  | 'cvs'           // highest CVS / Jacking Score (canonical trigger)
   | 'relevance';    // highest brandFit
 
 const SORT_LABELS: Record<ColumnSortKey, string> = {
@@ -20,6 +21,7 @@ const SORT_LABELS: Record<ColumnSortKey, string> = {
   volume:      'Highest volume',
   reach:       'Highest reach',
   opportunity: 'Best opportunity',
+  cvs:         'Highest CVS',
   relevance:   'Most relevant',
 };
 
@@ -32,6 +34,7 @@ function sortTrends(trends: Trend[], key: ColumnSortKey): Trend[] {
     case 'volume':      return arr.sort((a, b) => b.velocity - a.velocity);
     case 'reach':       return arr.sort((a, b) => Number(b.reach) - Number(a.reach));
     case 'opportunity': return arr.sort((a, b) => b.scores.opportunity - a.scores.opportunity);
+    case 'cvs':         return arr.sort((a, b) => (b.scores.jackingScore ?? 0) - (a.scores.jackingScore ?? 0));
     case 'relevance':   return arr.sort((a, b) => b.scores.brandFit - a.scores.brandFit);
   }
 }
@@ -125,6 +128,7 @@ export function BoardColumn({
            : sortKey === 'volume'    ? '↓vol'
            : sortKey === 'reach'     ? '↓reach'
            : sortKey === 'opportunity' ? '↓opp'
+           : sortKey === 'cvs'       ? '↓cvs'
            :                          '↓fit'}
         </button>
         {sortOpen && (

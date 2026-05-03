@@ -138,6 +138,12 @@ export interface Scores {
   productionEffort: number;// 0..1
   effort: number;          // derived
   opportunity: number;     // 0..100
+  /** CVS / Jacking Score / S_max — the canonical "should we act" signal.
+   *  0..1 scale. Computed via computeJackingScore(); stored alongside the
+   *  other scores in the per-trend JSON blob so no schema migration is
+   *  needed. Optional for backward-compat with rows persisted before
+   *  this field existed (rowToTrend defaults to 0). */
+  jackingScore?: number;   // 0..1
 }
 
 export interface ScoreRationale {
@@ -164,6 +170,11 @@ export interface Trend {
   sentiment: number;      // -1..1
   audienceOverlap: number;
   scores: Scores;
+  /** CVS / Jacking Score — the canonical "should we act" signal computed
+   *  from FIT × VEL × FM × Sp / max(0.05, RISK + CRINGE + SAT_eff).
+   *  Drives Creative Agent's go/no-go (≥0.35 default) and Verifier
+   *  auto-fire (≥0.70 default). Rendered as a chip on every TrendCard. */
+  jackingScore?: number;
   rationale: ScoreRationale[];
   recommendation: Recommendation;
   recommendationReason: string;

@@ -144,12 +144,28 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         >↗</a>
       </h3>
 
-      {/* row 3 — lineage */}
-      <p className="text-xs text-ink-300/70 line-clamp-1 mb-1.5">{trend.lineage}</p>
+      {/* row 3 — lineage + Why-Now caption when available. The "why now"
+          string is computed by the Resonance Agent (analyzeResonance);
+          when not present, we fall back to the recommendationReason
+          which already carries the brand-fit / risk explanation. Click
+          opens the drawer with the Lineage tab pre-focused. */}
+      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5">{trend.lineage}</p>
+      <p
+        className="text-2xs text-flare-400/80 line-clamp-1 mb-1.5 italic"
+        title={trend.recommendationReason}
+      >
+        ⤷ {trend.recommendationReason}
+      </p>
 
-      {/* row 4 — score chips */}
+      {/* row 4 — score chips. Single-row layout; CVS only renders when
+          the value is meaningful (legacy rows persisted before
+          jackingScore existed default to 0 — we hide those to avoid
+          adding a low-signal chip that breaks the row width). */}
       <div className="flex items-center gap-1 mb-1.5">
         <ScoreChip axis="opp" value={trend.scores.opportunity} />
+        {typeof trend.scores.jackingScore === 'number' && trend.scores.jackingScore > 0.04 && (
+          <ScoreChip axis="cvs" value={trend.scores.jackingScore} />
+        )}
         <ScoreChip axis="fit" value={trend.scores.brandFit} />
         <ScoreChip axis="risk" value={trend.scores.risk} invert />
         <ScoreChip axis="cringe" value={trend.scores.cringe} invert />

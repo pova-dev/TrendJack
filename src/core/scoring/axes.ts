@@ -11,7 +11,19 @@ import { clamp01, formatBig, pct, pushRationale, round } from './helpers';
 // edge, not the cumulative footprint.
 
 export function computeVirality(s: RawSignal, r: ScoreRationale[]): number {
-  const vNorm = Math.tanh(s.velocity / 500);
+  // Calibration:
+  //   velocity normalization at 100 posts/hour (was 500). The 500 constant
+  //   was tuned for X-firehose scale, but real RSS/Reddit/HN ingest tops
+  //   out around 50-200/hr; with the old constant, every non-firehose
+  //   trend produced virality<0.05, collapsing CVS's multiplicative
+  //   numerator to zero. New scale:
+  //     vel=10  → vNorm=0.10
+  //     vel=50  → vNorm=0.46
+  //     vel=100 → vNorm=0.76
+  //     vel=300 → vNorm=0.99
+  //   reach kept at 5M — that's a real-world threshold for "viral-scale"
+  //   audience and works across all source types.
+  const vNorm = Math.tanh(s.velocity / 100);
   const rNorm = Math.tanh(s.reach / 5_000_000);
   const v = clamp01(0.7 * vNorm + 0.3 * rNorm);
   pushRationale(r, 'virality', v, [
@@ -52,18 +64,53 @@ export function computeFirstMover(brandPostCount: number, r: ScoreRationale[]): 
 }
 
 // ---------------------------------------------------------------------------
-// Saturation — high reach + cooling velocity = saturated. Late entrants
-// to saturated trends get diminishing returns. Sigmoid penalty in the
-// composite (see engine.ts) so 0.6+ punishes hard.
+// Saturation — three contributing factors:
+//   1. Reach factor: trend has accumulated cumulative audience.
+//   2. Velocity cooling: trend HAD volume but is now dying. Critically,
+//      this only applies when reach is high enough that the trend was
+//      ever genuinely "hot" — a Reddit post with 1 upvote and 100 reach
+//      hasn't "cooled", it's just noise. The previous formula treated
+//      every low-velocity signal as saturated, producing SAT=0.5 baseline
+//      for almost every trend and dragging CVS to near-zero.
+//   3. Competitor share-of-voice: when ≥40% of the trend's siblings
+//      mention competitors (per the audit spec's "Already Claimed →
+//      Dilutive" rule), we add SoV-derived drag. This is the linkage
+//      from the Lineage Agent the audit flagged as missing.
+//
+// Sigmoid penalty in the composite (see engine.ts) so 0.6+ punishes hard.
 
-export function computeSaturation(s: RawSignal, r: ScoreRationale[]): number {
+const REACH_FLOOR_FOR_COOLING = 10_000;
+
+export function computeSaturation(
+  s: RawSignal,
+  r: ScoreRationale[],
+  /** Optional: 0..1 share-of-voice held by competitors in this trend's
+   *  cross-source lineage. Filter Agent computes this via the Lineage
+   *  Agent's buildLineageLookup() and passes it through ScoringContext. */
+  competitorShareOfVoice?: number,
+): number {
   const reachFactor = Math.tanh(s.reach / 10_000_000);
-  const velocityCool = s.velocity < 50 ? 0.5 : 0;
-  const v = clamp01(0.4 * reachFactor + velocityCool);
-  pushRationale(r, 'saturation', v, [
-    `reach factor ${pct(reachFactor)}`,
-    velocityCool ? 'velocity cooling — late entrants saturate fast' : 'velocity still hot',
-  ]);
+  const hadVolume = s.reach >= REACH_FLOOR_FOR_COOLING;
+  const velocityCool = (hadVolume && s.velocity < 50) ? 0.5 : 0;
+
+  // SoV linkage. Above the 40% dilutive threshold, add a graduated
+  // contribution that tops out at +0.30. This is the wiring the Phase 6.5
+  // Lineage Agent was built for.
+  let sovContribution = 0;
+  if (competitorShareOfVoice && competitorShareOfVoice >= 0.40) {
+    // Linear ramp: 0.40 → 0, 0.70 → 0.18, 1.00 → 0.30
+    sovContribution = Math.min(0.30, (competitorShareOfVoice - 0.40) * 0.50);
+  }
+
+  const v = clamp01(0.4 * reachFactor + velocityCool + sovContribution);
+  const reasons: string[] = [`reach factor ${pct(reachFactor)}`];
+  if (velocityCool) reasons.push('velocity cooling on a high-reach trend — late entrants saturate fast');
+  else if (!hadVolume) reasons.push('low velocity but never had volume — not saturation');
+  else reasons.push('velocity still hot');
+  if (sovContribution > 0) {
+    reasons.push(`competitor SoV ${pct(competitorShareOfVoice!)} — dilutive territory (+${pct(sovContribution)} drag)`);
+  }
+  pushRationale(r, 'saturation', v, reasons);
   return round(v);
 }
 

@@ -1,11 +1,17 @@
 import * as React from 'react';
 import { Chip } from '@/components/ui/Chip';
 
-type Axis = 'opp' | 'fit' | 'risk' | 'cringe' | 'sat' | 'vel' | 'time' | 'fm';
+type Axis = 'opp' | 'fit' | 'risk' | 'cringe' | 'sat' | 'vel' | 'time' | 'fm' | 'cvs';
 
 const LABELS: Record<Axis, string> = {
   opp: 'OPP', fit: 'FIT', risk: 'RISK', cringe: 'CRINGE',
   sat: 'SAT', vel: 'VEL', time: 'TIME', fm: 'FM',
+  // CVS = (FIT × VEL × FM × Sp) / max(0.05, RISK + CRINGE + SAT_eff)
+  // The canonical "should we act" signal — drives Verifier auto-fire +
+  // Creative Agent gate. Rendered alongside OPP so operators can compare
+  // the additive dashboard ranker (OPP) with the multiplicative trigger
+  // (CVS) at a glance.
+  cvs: 'CVS',
 };
 
 export function ScoreChip({
