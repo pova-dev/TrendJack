@@ -105,7 +105,7 @@ export function TelegramManager({ initial }: { initial: TgConn[] }) {
   );
 }
 
-const inputCls = 'block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500';
+const inputCls = 'block w-full h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

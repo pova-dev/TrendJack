@@ -128,7 +128,7 @@ export function Copilot() {
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Ask anything about your war room…"
-              className="flex-1 h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-xs text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500"
+              className="flex-1 h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-xs text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
             />
             <Button type="submit" variant="primary" size="sm" disabled={busy || !input.trim()}>Ask</Button>
           </form>

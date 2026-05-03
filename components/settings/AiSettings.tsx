@@ -155,7 +155,7 @@ export function AiSettings({ initial }: { initial: CredItem[] }) {
                       placeholder={set ? maskFor(p.envKey) : 'Paste your key'}
                       value={draft[p.envKey] ?? ''}
                       onChange={e => setDraft(d => ({ ...d, [p.envKey]: e.target.value }))}
-                      className="flex-1 h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-flare-500 font-mono"
+                      className="flex-1 h-9 px-2.5 rounded-md bg-ink-800 border border-ink-700 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900 font-mono"
                     />
                     <Button variant="primary" size="sm" disabled={busy || !draft[p.envKey]} onClick={() => save(p.envKey)}>
                       {savedKey === p.envKey ? 'Saved ✓' : 'Save'}

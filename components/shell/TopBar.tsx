@@ -69,7 +69,7 @@ export function TopBar({ brand, brands, trendCount, postNowCount, liveAt, onAddC
             one tap-target. Sticky-positioned popover on tap. */}
         <button
           onClick={() => setOverflowOpen(v => !v)}
-          className="md:hidden flex items-center justify-center w-9 h-9 rounded-md hover:bg-ink-800 text-ink-300"
+          className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-ink-800 text-ink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
           title="More controls"
           aria-expanded={overflowOpen}
           aria-label="Open menu"
