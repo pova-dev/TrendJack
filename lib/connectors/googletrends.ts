@@ -12,6 +12,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
 import type { RawSignal } from '@/lib/scoring/engine';
 import { classifyTrendCategory, type GtrendsCategoryId } from '@/lib/gtrends-classifier';
+import { GoogleTrendsRealtimeConnector } from './googletrends-realtime';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
@@ -37,6 +38,20 @@ export class GoogleTrendsConnector implements Connector {
   mode = 'live' as const;
 
   async poll(opts: ConnectorPollOpts): Promise<ConnectorResult> {
+    // Two-stage poll: try the realtime boq RPC (which mirrors what the
+    // operator sees on trends.google.com/trending?geo=IN) first; on any
+    // failure (Google deploy changes the RPC, network blip, etc.) fall
+    // back to the legacy RSS feed so the column never goes empty. The
+    // RSS feed returns Daily Hot Searches — a different, stale dataset —
+    // but that's better than nothing.
+    if (process.env.GTRENDS_DISABLE_REALTIME !== '1') {
+      const realtime = await new GoogleTrendsRealtimeConnector().poll(opts);
+      if (realtime.ok && realtime.signals.length > 0) {
+        return realtime;
+      }
+      // Realtime returned no items or errored — fall through to RSS.
+    }
+
     // Geo precedence: per-call override > org credential > env > default IN.
     // Accepts ISO codes (IN, US), Google state codes (IN-MH, US-NY), or
     // US DMA codes for city-level (e.g. 501 = New York).
