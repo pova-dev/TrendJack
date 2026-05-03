@@ -35,14 +35,21 @@ const HOST_RULES: Array<[RegExp, GtrendsCategoryId]> = [
 
 // Title-keyword fallback. Lower confidence than host rules — we only
 // use this when host doesn't match anything. Order = priority.
+//
+// Includes English keywords + Devanagari (Hindi/Marathi) script + common
+// brand names that appear unaccompanied (e.g. "nvidia", "samsung") so a
+// single-word trend title like "सैमसंग" still classifies correctly.
 const TITLE_RULES: Array<[RegExp, GtrendsCategoryId]> = [
   // Sports — explicit "vs" matches between two teams/players, plus
-  // common league/match shorthand (IPL, EPL, ODI, T20, etc).
-  [/\b(vs|v\.|v\s)\b|\b(ipl|epl|laliga|fifa|odi|t20|test match|grand prix|wwe|ufc|atp|wta|premier league|world cup|champions league)\b/i, 't'],
-  [/\b(stock|nasdaq|sensex|nifty|ipo|earnings|merger|acquisition|fundraise|funding round|inflation|interest rate|crypto)\b/i, 'b'],
-  [/\b(film|movie|trailer|teaser|box office|series|season \d|netflix|prime video|hotstar|spotify|grammy|oscar)\b/i, 'e'],
-  [/\b(iphone|samsung|android|chip|gpu|ai|chatgpt|gemini|llm|launch|release|app|pixel|macbook|leak|specs|review)\b/i, 'm'],
-  [/\b(vaccine|covid|outbreak|disease|symptom|diet|workout|cancer|diabetes|fitness|wellness)\b/i, 'h'],
+  // common league/match shorthand (IPL, EPL, ODI, T20, etc), plus
+  // Hindi स्पोर्ट्स / क्रिकेट / मैच markers.
+  [/\b(vs|v\.|v\s)\b|\b(ipl|epl|laliga|fifa|odi|t20|test match|grand prix|wwe|ufc|atp|wta|premier league|world cup|champions league|titans|chargers|kings|royals|riders)\b|बनाम|क्रिकेट|मैच|खेल/i, 't'],
+  [/\b(stock|nasdaq|sensex|nifty|ipo|earnings|merger|acquisition|fundraise|funding round|inflation|interest rate|crypto|bitcoin|ethereum|rupee|dollar)\b|शेयर|बाजार|निवेश/i, 'b'],
+  [/\b(film|movie|trailer|teaser|box office|series|season \d|netflix|prime video|hotstar|spotify|grammy|oscar|bollywood|tollywood)\b|फिल्म|गाना|सीरीज/i, 'e'],
+  // Tech — adds many smartphone / chip / AI brand names that often
+  // appear standalone as a trend title. Plus Hindi स्मार्टफोन / सैमसंग.
+  [/\b(iphone|samsung|android|chip|gpu|cpu|ai|chatgpt|gemini|llm|launch|release|app|pixel|macbook|leak|specs|review|nvidia|intel|amd|qualcomm|snapdragon|mediatek|oneplus|xiaomi|oppo|vivo|realme|tecno|infinix|nothing|cmf|smartphone|tablet|laptop|software|update|os|os update|beta|firmware|tesla|spacex|openai|deepmind|meta ai|apple|google|microsoft|alphabet|amazon)\b|स्मार्टफोन|सैमसंग|आईफोन|टेक्नोलॉजी/i, 'm'],
+  [/\b(vaccine|covid|outbreak|disease|symptom|diet|workout|cancer|diabetes|fitness|wellness)\b|स्वास्थ्य|बीमारी/i, 'h'],
 ];
 
 interface ClassifierInput {

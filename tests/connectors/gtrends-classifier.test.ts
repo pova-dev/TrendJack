@@ -74,4 +74,23 @@ describe('classifyTrendCategory', () => {
     expect(classifyTrendCategory({ title: 'standalone term' })).toBe('top');
     expect(classifyTrendCategory({ title: '', newsSource: 'ESPN India' })).toBe('t');
   });
+
+  // Pinned: every item Google's own Technology filter (category=18)
+  // showed for India must classify as 'm'. If the classifier loses
+  // any of these, the Sci & Tech column will silently drop it and
+  // the operator will see a smaller list than Google's UI.
+  describe('matches Google\'s Technology filter for India', () => {
+    it('apple iphone 18 pro max', () => {
+      expect(classifyTrendCategory({ title: 'apple iphone 18 pro max' })).toBe('m');
+    });
+    it('Hindi: सैमसंग', () => {
+      expect(classifyTrendCategory({ title: 'सैमसंग' })).toBe('m');
+    });
+    it('nvidia (single brand name, no source)', () => {
+      expect(classifyTrendCategory({ title: 'nvidia' })).toBe('m');
+    });
+    it('Hindi: स्मार्टफोन', () => {
+      expect(classifyTrendCategory({ title: 'स्मार्टफोन' })).toBe('m');
+    });
+  });
 });

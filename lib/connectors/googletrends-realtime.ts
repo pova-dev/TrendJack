@@ -105,13 +105,23 @@ export class GoogleTrendsRealtimeConnector implements Connector {
       const ageH = Math.max(1, (Date.now() / 1000 - it.startUnix) / 3600);
       const velocity = Math.min(10000, Math.max(10, it.searchVolume / ageH));
 
+      // firstSeenAt = wall-clock now, NOT the trend's underlying start
+      // time. Reason: the dashboard's listTrends pulls the top-N by
+      // firstSeenAt DESC. Using the trend's start time (often 3-7h ago)
+      // means realtime trends always sort behind RSS daily-trends items
+      // whose pubDate is incidentally newer (~1h ago). What the operator
+      // cares about is "when did we first see this trend" — that's now.
+      // The actual start time is preserved in summary + lineage.
+      const summary = it.relatedTerms.slice(0, 5).join(' · ') || `Trending in ${geo} (${it.searchVolume.toLocaleString()}+ searches).`;
+      const ageDescriptor = ageH < 1.5 ? '~1h ago' : `${Math.round(ageH)}h ago`;
+
       signals.push({
         source: 'google_trends',
         title: it.title.slice(0, 200),
-        summary: it.relatedTerms.slice(0, 5).join(' · ') || `Trending in ${geo} (${it.searchVolume.toLocaleString()}+ searches).`,
+        summary,
         hashtags: ['#GoogleTrends'],
-        lineage: `[cat:${cat}] Google Trends · ${geo} · ${it.searchVolume.toLocaleString()}+ searches · ${it.growthPct >= 1000 ? '↑1000%+' : `↑${it.growthPct}%`} (${hours}h)`,
-        firstSeenAt: new Date(it.startUnix * 1000),
+        lineage: `[cat:${cat}] Google Trends · ${geo} · ${it.searchVolume.toLocaleString()}+ searches · started ${ageDescriptor} · ${it.growthPct >= 1000 ? '↑1000%+' : `↑${it.growthPct}%`} (${hours}h)`,
+        firstSeenAt: new Date(),
         velocity,
         reach: it.searchVolume,
         sentiment: 0,
