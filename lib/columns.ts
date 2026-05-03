@@ -1,49 +1,31 @@
 import type { ColumnConfig, Trend, ColumnType } from '@/types';
 
 // ──────────────────────────────────────────────────────────────────────
-// Cross-column priority. A trend whose filters match multiple columns
-// is shown in EXACTLY ONE — the highest-priority match. Lower number =
-// higher priority (claims first).
+// Cross-column claim priority.
+//
+// The OPERATOR'S COLUMN ORDER is the priority. Whatever they put first
+// claims first. Drag a column left → it claims earlier. This matches how
+// kanban-style boards work everywhere: the leftmost lane is the most-
+// specific bucket.
+//
+// Observer columns (Alerts / Risk / Decay / Compliance / Crisis) are
+// excluded from the claim phase — they tap the stream and show their
+// filtered view independently. Without this, an Alerts column with an
+// empty filter (`{}`) would claim everything.
+//
+// Pinned Watchlist (filters.pinnedOnly) ALSO opts out of being
+// claimed-against (a pinned trend always shows there) but it DOES still
+// claim from the pool — we don't want a pinned trend to also appear in
+// some other column.
 // ──────────────────────────────────────────────────────────────────────
-const COLUMN_PRIORITY: Record<ColumnType, number> = {
-  alerts:                100,
-  compliance_hold:       110,
-  crisis_watch:          120,
-  brand_matches:         200,   // brand-keyword hits → here, not elsewhere
-  competitor_activity:   300,
-  first_mover_window:    400,
-  risk_watch:            500,
-  decay_watch:           550,
-  approved_opportunities:600,
-  draft_ideas:           650,
-  creator_signals:       700,
-  emerging_memes:        750,
-  high_velocity:         800,
-  rising_trends:         900,   // broad catch-all, claims last
-  localization_queue:    950,
-  custom:                999,
-};
 
-/** Observer columns — these TAP the trend stream (show their filtered view)
- *  but do NOT claim trends. They're warning / oversight lanes; a trend
- *  appearing in Risk Watch should still appear in its primary lane.
- *
- *  Without this distinction, an Alerts column with empty filters (`{}`)
- *  would claim ALL trends at priority 100 and leave every other column
- *  empty.
- */
 const OBSERVER_TYPES = new Set<ColumnType>([
   'alerts', 'risk_watch', 'decay_watch', 'compliance_hold', 'crisis_watch',
 ]);
 
-/** Sort columns by priority (specific → broad), break ties via render order.
- *  Observer columns are excluded — they don't participate in the claim phase. */
+/** Order columns for the claim phase: respect user ordering, drop observers. */
 export function priorityOrderedColumns<T extends { id: string; type: ColumnType }>(cols: T[]): T[] {
-  return cols
-    .filter(c => !OBSERVER_TYPES.has(c.type))
-    .map((c, idx) => ({ c, idx, p: COLUMN_PRIORITY[c.type] ?? 999 }))
-    .sort((a, b) => a.p - b.p || a.idx - b.idx)
-    .map(x => x.c);
+  return cols.filter(c => !OBSERVER_TYPES.has(c.type));
 }
 
 /**
