@@ -366,18 +366,12 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
       </Section>
 
       <Section title="Recommendation"><p>{trend.recommendationReason}</p></Section>
-      <Section title="Score snapshot">
-        <div className="grid grid-cols-2 gap-2">
-          <ScoreChip axis="opp"  value={trend.scores.opportunity} />
-          <ScoreChip axis="fit"  value={trend.scores.brandFit} />
-          <ScoreChip axis="time" value={trend.scores.timing} />
-          <ScoreChip axis="vel"  value={Math.min(1, trend.velocity / 1500)} />
-          <ScoreChip axis="risk" value={trend.scores.risk} invert />
-          <ScoreChip axis="cringe" value={trend.scores.cringe} invert />
-          <ScoreChip axis="sat"  value={trend.scores.saturation} invert />
-          <ScoreChip axis="fm"   value={trend.scores.firstMover} />
-        </div>
-      </Section>
+      {/* Score snapshot intentionally NOT rendered here. The TrendCard
+          already shows OPP/FIT/RISK/CRINGE at scan-level; the dedicated
+          Scores tab below shows the full 8-axis breakdown with
+          rationale. Duplicating them in Overview was a P0 finding from
+          the Trinity Swarm Visual Auditor — operators saw the same
+          chips twice within 400ms of opening the drawer. */}
       {trend.competitorClaimed && (
         <Section title="Already claimed">
           <div className="flex flex-wrap gap-1">{trend.competitorClaimants.map(c => <Chip key={c} tone="bad">{c}</Chip>)}</div>
@@ -399,10 +393,53 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
         </Section>
       ) : null}
 
-      <Section title="Web research">
-        <ResearchPanel research={research} loading={researching} onRun={onResearch} compact />
-      </Section>
+      {/* Research strip — one-line summary only on Overview. The full
+          panel lives on the Research tab. Was previously the entire
+          ResearchPanel rendered twice (P0b from the Trinity Swarm
+          Visual Auditor). */}
+      <ResearchSummaryStrip research={research} loading={researching} />
     </>
+  );
+}
+
+function ResearchSummaryStrip({ research, loading }: {
+  research: ResearchPayload | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <Section title="Web research">
+        <p className="text-2xs text-ink-400 italic">Researching…</p>
+      </Section>
+    );
+  }
+  if (!research) {
+    return (
+      <Section title="Web research">
+        <p className="text-2xs text-ink-400">
+          No research yet — open the <span className="font-mono text-ink-200">Research</span> tab to run a probe.
+        </p>
+      </Section>
+    );
+  }
+  const verified = research.verifiedClaims?.length ?? 0;
+  const unverified = research.unverifiedClaims?.length ?? 0;
+  const sourceCount = research.sources?.length ?? 0;
+  let topHost: string | null = null;
+  try {
+    if (research.sources?.[0]?.url) topHost = new URL(research.sources[0].url).hostname.replace(/^www\./, '');
+  } catch { /* ignore */ }
+  return (
+    <Section title="Web research">
+      <p className="text-xs text-ink-200">
+        {verified > 0 ? <><span className="text-good-400 font-mono">{verified}</span> verified claim{verified === 1 ? '' : 's'}</> : <span className="text-ink-400">no verified claims</span>}
+        {unverified > 0 && <> · <span className="text-ink-400 font-mono">{unverified} unverified</span></>}
+        {sourceCount > 0 && <> · <span className="text-ink-300">{sourceCount} source{sourceCount === 1 ? '' : 's'}{topHost ? ` (top: ${topHost})` : ''}</span></>}
+      </p>
+      <p className="mt-1 text-2xs text-ink-400">
+        Open the <span className="font-mono text-ink-200">Research</span> tab for full citations + per-claim quoted spans.
+      </p>
+    </Section>
   );
 }
 
