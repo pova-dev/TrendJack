@@ -101,7 +101,24 @@ export function score(signal: RawSignal, ctx: ScoringContext): ScoreResult {
     weights.cringe * cringe -
     weights.formatFatigue * formatFatigue -
     weights.effort * effort;
-  const opportunity = Math.round(clamp01(raw) * 100);
+  let opportunity = Math.round(clamp01(raw) * 100);
+
+  // Calibration nudge — Feature D Phase 1. Applied AFTER the additive
+  // composite, BEFORE the recommendation decision. CVS computed below
+  // uses the raw axes only; the multiplier touches `opportunity` and
+  // therefore changes ranking but never gating. Per CLAUDE.md hard
+  // rule 4: opportunity drives dashboard sort, jackingScore drives
+  // content-gen go/no-go — they serve different jobs.
+  if (ctx.calibrationProvider) {
+    const boost = ctx.calibrationProvider(signal, {
+      scores: {
+        opportunity, brandFit, risk, cringe, saturation, firstMover,
+      },
+    });
+    if (Number.isFinite(boost) && boost > 0) {
+      opportunity = Math.round(Math.max(0, Math.min(100, opportunity * boost)));
+    }
+  }
 
   // --- CVS / Jacking Score / S_max (canonical signal strength) -----------
   // CVS = (FIT × VEL_eff × FM × Sp) / max(0.05, RISK + CRINGE + SAT_eff)

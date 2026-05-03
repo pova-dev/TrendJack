@@ -19,6 +19,11 @@ export interface SignalEnrichment {
   hoursSinceCompetitorClaim?: number;
   competitorShareOfVoice?: number;
   brandPostCountForTrend?: number;
+  /** Calibration boost provider (Feature D). Threaded into ScoringContext
+   *  so the Filter Agent's score() call applies the per-brand learned
+   *  multiplier to opportunity. CVS is never touched. Returns 1.0 for
+   *  cold-start brands. */
+  calibrationProvider?: (signal: import('@/src/core/scoring/types').RawSignal, partialResult: { scores: { opportunity: number; brandFit: number; risk: number; cringe: number; saturation: number; firstMover: number } }) => number;
 }
 
 /**
@@ -101,6 +106,26 @@ export async function enrichSignal(
       if (totalMatching > 0) out.competitorShareOfVoice = claimedMatching / totalMatching;
     }
   }
+
+  // Calibration provider — bind brandId so score() can apply the
+  // per-brand multiplier. The agent's calibrationBoost is synchronous
+  // and reads from an in-memory cache; safe to call inside the engine.
+  const { calibrationBoost } = await import('@/src/agents/calibration');
+  out.calibrationProvider = (signal, partial) =>
+    calibrationBoost(brandId, signal, {
+      scores: {
+        opportunity: partial.scores.opportunity,
+        brandFit: partial.scores.brandFit,
+        risk: partial.scores.risk,
+        cringe: partial.scores.cringe,
+        saturation: partial.scores.saturation,
+        firstMover: partial.scores.firstMover,
+        // Stub the rest of Scores — calibrationBoost only reads these 6
+        // axes. Type-coerced for the synthetic ScoreResult.
+      } as never,
+      recommendation: 'MONITOR' as never,
+      brandKeywordHit: signal.title.length > 0,  // fallback, not used by buckets
+    } as never);
 
   return out;
 }

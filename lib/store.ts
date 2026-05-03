@@ -240,10 +240,67 @@ export async function getTrend(trendId: string): Promise<Trend | null> {
   return row ? rowToTrend(row) : null;
 }
 
+// Polarity table for operator feedback. CLAUDE-encoded:
+//   save / approve / pin / generate    →  +1  (positive — operator endorsed)
+//   dismiss / reject                    →  -1  (negative — operator rejected)
+//   snooze / follow / assign / unpin    →   0  (neutral — logged, not training)
+//   export                              →   0
+const ACTION_POLARITY: Record<ActionType, -1 | 0 | 1> = {
+  save:     1,
+  approve:  1,
+  pin:      1,
+  generate: 1,
+  dismiss: -1,
+  reject:  -1,
+  snooze:   0,
+  follow:   0,
+  assign:   0,
+  export:   0,
+  unpin:    0,
+};
+
 export async function recordAction(trendId: string, type: ActionType, actor = 'user_demo', payload?: unknown) {
   await prisma.trendAction.create({
     data: { trendId, type, actor, payload: payload ? JSON.stringify(payload) : null },
   });
+
+  // Publish to STREAMS.operatorFeedback (Feature D — Calibration Engine).
+  // Snapshots the trend's feature state at action-time so the
+  // calibration agent has a labeled training pair. We do this AFTER the
+  // TrendAction insert so the audit trail is durable even if the bus
+  // fan-out fails. Bus errors are swallowed — calibration is non-
+  // critical telemetry.
+  try {
+    const trendRow = await prisma.trend.findUnique({ where: { id: trendId } });
+    if (!trendRow) return;
+    const scores = parseJSON(trendRow.scores, {} as Record<string, number>);
+    const polarity = ACTION_POLARITY[type] ?? 0;
+
+    const { getBus } = await import('@/src/core/state');
+    const { STREAMS } = await import('@/src/core/state/streams');
+    await getBus().publish(STREAMS.operatorFeedback, {
+      brandId: trendRow.brandId,
+      trendId,
+      userId: actor,
+      action: type,
+      polarity,
+      features: {
+        fit: typeof scores.brandFit === 'number' ? scores.brandFit : 0,
+        velocity: trendRow.velocity,
+        firstMover: typeof scores.firstMover === 'number' ? scores.firstMover : 0,
+        risk: typeof scores.risk === 'number' ? scores.risk : 0,
+        cringe: typeof scores.cringe === 'number' ? scores.cringe : 0,
+        saturation: typeof scores.saturation === 'number' ? scores.saturation : 0,
+        cascadePhase: (trendRow.cascadePhase as 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying' | null) ?? null,
+        brandKeywordHit: trendRow.brandKeywordHit ?? false,
+        recommendation: trendRow.recommendation,
+        opportunity: typeof scores.opportunity === 'number' ? scores.opportunity : 0,
+      },
+      emittedAt: new Date(),
+    });
+  } catch {
+    // Calibration is non-critical — never let a bus blip break action recording.
+  }
 }
 
 // -----------------------------------------------------------------------------

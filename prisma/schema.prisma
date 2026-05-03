@@ -348,6 +348,54 @@ model AuditLog {
   @@index([orgId, createdAt])
 }
 
+/// Operator feedback events (Feature D — Calibration Engine).
+///
+/// Append-only log of every operator action on a trend, with a feature
+/// snapshot captured at the moment of action. Two purposes:
+///   1. Audit trail — proves what the operator saw when they decided.
+///   2. Replayable training corpus — re-bucketing the estimator down
+///      the line just rescans this table; we never need the historical
+///      bucket table to get the math right.
+///
+/// `features` is the JSON-stringified RawSignal-shaped snapshot. The
+/// calibration agent reads this on cold-boot to backfill buckets when
+/// the in-memory estimator is freshly initialized.
+model FeedbackEvent {
+  id          String   @id @default(cuid())
+  trendId     String
+  brandId     String
+  userId      String
+  action      String   // ActionType union member
+  polarity    Int      // -1 | 0 | 1
+  features    String   // JSON snapshot
+  reason      String?
+  createdAt   DateTime @default(now())
+  @@index([brandId, createdAt])
+  @@index([trendId, createdAt])
+}
+
+/// Per-(brand × axis × bucket) Bayesian beta-binomial estimator.
+///
+/// Rolled up from FeedbackEvent rows by the calibration agent. The
+/// numerator is `(positiveCount + 1)`, denominator is
+/// `(positiveCount + negativeCount + 2)` (Laplace smoothing). The
+/// product of bucket multipliers across axes becomes the per-trend
+/// `calibrationBoost ∈ [0.5, 1.5]` clamp. CVS is NOT touched.
+///
+/// `axis` values: 'fit' | 'velocity' | 'cringe' | 'saturation' | 'cascadePhase' | …
+/// `bucket` values: 'low' | 'mid' | 'high' for numeric axes; phase enum value for cascadePhase.
+model OperatorFeedbackBucket {
+  id            String   @id @default(cuid())
+  brandId       String
+  axis          String
+  bucket        String
+  positiveCount Int      @default(0)
+  negativeCount Int      @default(0)
+  updatedAt     DateTime @updatedAt
+  @@unique([brandId, axis, bucket])
+  @@index([brandId])
+}
+
 /// AI-Search Citation samples (Feature A — GEO).
 ///
 /// The GEO agent polls LLMs (Gemini, Claude, GPT, Perplexity) twice

@@ -113,6 +113,46 @@ export interface CringeDecayMessage {
   hasPeaked: boolean;
 }
 
+/** Emitted by lib/store.recordAction whenever an operator acts on a trend.
+ *  Drives the Calibration Engine (Feature D) — each event is a labeled
+ *  training pair (signal feature snapshot + operator decision polarity)
+ *  that the calibration agent rolls up into per-(brand × axis × bucket)
+ *  estimators. The estimator nudges `opportunity` ranking via an
+ *  out-of-engine multiplier; CVS is never touched (CLAUDE.md rule 4). */
+export interface OperatorFeedbackMessage {
+  brandId: string;
+  trendId: string;
+  userId: string;
+  /** Action taken — same union as the existing ActionType in @/types. */
+  action: 'save' | 'dismiss' | 'snooze' | 'follow' | 'assign' | 'export'
+        | 'approve' | 'reject' | 'generate' | 'pin' | 'unpin';
+  /** Implicit polarity:
+   *    save / approve / pin / generate  → +1
+   *    dismiss / reject                  → -1
+   *    snooze / unpin / follow / assign  →  0 (neutral; logged but not
+   *                                            re-weighted into buckets)  */
+  polarity: -1 | 0 | 1;
+  /** Feature snapshot at the moment of action — what the operator SAW.
+   *  Stored as raw numbers so re-bucketing later doesn't lose history. */
+  features: {
+    fit: number;
+    velocity: number;
+    firstMover: number;
+    risk: number;
+    cringe: number;
+    saturation: number;
+    cascadePhase: 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying' | null;
+    brandKeywordHit: boolean;
+    recommendation: string;
+    opportunity: number;
+  };
+  /** Optional operator-supplied "why" — captured by a future "Why dismissed?"
+   *  modal. Helps disambiguate "bad recommendation" from "I shipped this
+   *  elsewhere already" (Phase 1 ships without the modal). */
+  reason?: string;
+  emittedAt: Date;
+}
+
 /** Emitted by ArchitectAgent / FilterAgent for "POST_NOW" + crisis events. */
 export interface AlertMessage {
   brandId: string;
@@ -135,6 +175,7 @@ export const STREAMS = {
   resonance:       { name: 'tj.trends.resonance' } as StreamId<ResonanceMessage>,
   cringeDecay:     { name: 'tj.trends.cringe-decay' } as StreamId<CringeDecayMessage>,
   alerts:          { name: 'tj.alerts'           } as StreamId<AlertMessage>,
+  operatorFeedback:{ name: 'tj.operator.feedback'} as StreamId<OperatorFeedbackMessage>,
 } as const;
 
 export type StreamName = (typeof STREAMS)[keyof typeof STREAMS]['name'];
