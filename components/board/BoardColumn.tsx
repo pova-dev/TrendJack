@@ -3,6 +3,19 @@ import * as React from 'react';
 import type { ColumnConfig, Trend } from '@/types';
 import { TrendCard } from '@/components/trend/TrendCard';
 import { cn } from '@/lib/utils';
+import type { ClusteredTrend } from '@/lib/columns';
+
+// Time-window options for Brand Matches column. Operator picks how far
+// back to look — 'today' is the default reactive lens; '30d' is the
+// retrospective audit lens. Stored per-column in localStorage so the
+// preference survives reloads.
+export type WindowDays = 1 | 7 | 15 | 30;
+const WINDOW_LABELS: Record<WindowDays, string> = {
+  1:  'Today',
+  7:  '7 days',
+  15: '15 days',
+  30: '30 days',
+};
 
 // Per-column sort options. Persisted to localStorage so each operator's
 // preference survives reloads. Default is "latest" (firstSeenAt DESC).
@@ -67,23 +80,44 @@ export function BoardColumn({
 }: Props) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
+  const [windowOpen, setWindowOpen] = React.useState(false);
   const sortStorageKey = `tj.col-sort.${column.id}`;
+  const windowStorageKey = `tj.col-window.${column.id}`;
   const [sortKey, setSortKey] = React.useState<ColumnSortKey>('latest');
+  // Brand Matches gets the window selector. Default 'Today' so the
+  // reactive lens is the primary view; switch to 7/15/30d for audit.
+  const showWindow = column.type === 'brand_matches';
+  const [windowDays, setWindowDays] = React.useState<WindowDays>(1);
 
-  // Restore the operator's sort preference on mount + persist on change.
+  // Restore preferences on mount + persist on change.
   React.useEffect(() => {
     try {
       const v = localStorage.getItem(sortStorageKey);
       if (v && v in SORT_LABELS) setSortKey(v as ColumnSortKey);
+      const w = localStorage.getItem(windowStorageKey);
+      if (w && [1, 7, 15, 30].includes(Number(w))) setWindowDays(Number(w) as WindowDays);
     } catch { /* localStorage may be unavailable in private mode */ }
-  }, [sortStorageKey]);
+  }, [sortStorageKey, windowStorageKey]);
   const updateSort = (k: ColumnSortKey) => {
     setSortKey(k);
     setSortOpen(false);
     try { localStorage.setItem(sortStorageKey, k); } catch {}
   };
+  const updateWindow = (d: WindowDays) => {
+    setWindowDays(d);
+    setWindowOpen(false);
+    try { localStorage.setItem(windowStorageKey, String(d)); } catch {}
+  };
 
-  const sortedTrends = React.useMemo(() => sortTrends(trends, sortKey), [trends, sortKey]);
+  // Brand Matches: filter trends by the selected window before sorting.
+  // Older trends in longer windows get a LEGACY treatment via TrendCard.
+  const windowedTrends = React.useMemo(() => {
+    if (!showWindow) return trends;
+    const cutoff = Date.now() - windowDays * 24 * 3_600_000;
+    return trends.filter(t => new Date(t.firstSeenAt).getTime() >= cutoff);
+  }, [trends, showWindow, windowDays]);
+
+  const sortedTrends = React.useMemo(() => sortTrends(windowedTrends, sortKey), [windowedTrends, sortKey]);
   const tickLabel = lastTickAt
     ? `${Math.max(0, Math.floor((Date.now() - lastTickAt.getTime()) / 1000))}s`
     : '—';
@@ -115,10 +149,46 @@ export function BoardColumn({
         <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-100 truncate">{column.title}</h2>
         <span
           className="text-2xs font-mono text-ink-400 tabular-nums ml-auto bg-ink-800 rounded px-1.5 py-0.5"
-          title={`${trends.length} trends in this column`}
+          title={`${windowedTrends.length} trends in this column`}
         >
-          {trends.length}
+          {windowedTrends.length}
         </span>
+        {/* Brand Matches: window selector (Today/7d/15d/30d). Operator
+            picks the look-back lens — reactive (today) vs retrospective
+            (30d). Per-column, persisted to localStorage. */}
+        {showWindow && (
+          <>
+            <button
+              draggable={false}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); setWindowOpen(v => !v); }}
+              className="flex items-center gap-1 text-2xs font-mono text-ink-300 hover:text-ink-100 hover:bg-ink-800 px-1.5 py-0.5 rounded border border-ink-700/60"
+              title={`Window: ${WINDOW_LABELS[windowDays]} — click to change`}
+            >
+              <span className="text-ink-500">📅</span>
+              <span>{WINDOW_LABELS[windowDays]}</span>
+            </button>
+            {windowOpen && (
+              <div
+                onMouseDown={e => e.stopPropagation()}
+                className="absolute right-24 top-9 z-20 w-32 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-1"
+              >
+                {([1, 7, 15, 30] as WindowDays[]).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => updateWindow(d)}
+                    className={cn(
+                      'block w-full text-left px-2 py-1.5 text-xs rounded',
+                      d === windowDays ? 'text-flare-400 bg-ink-700' : 'text-ink-200 hover:bg-ink-700',
+                    )}
+                  >
+                    {WINDOW_LABELS[d]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
         {/* Sort selector — text label instead of cryptic glyph. Each
             sort key gets a short word so the operator can read what's
             active at a glance. */}
@@ -186,15 +256,20 @@ export function BoardColumn({
         {sortedTrends.length === 0 && (
           <div className="px-3 py-6 text-center text-2xs text-ink-400 font-mono">no signals match this column&apos;s filters</div>
         )}
-        {sortedTrends.map(t => (
-          <TrendCard
-            key={t.id}
-            trend={t}
-            active={activeTrendId === t.id}
-            onOpen={onOpenTrend}
-            onAction={onAction}
-          />
-        ))}
+        {sortedTrends.map(t => {
+          const c = t as ClusteredTrend;
+          return (
+            <TrendCard
+              key={t.id}
+              trend={t}
+              active={activeTrendId === t.id}
+              onOpen={onOpenTrend}
+              onAction={onAction}
+              clusterCount={c._clusterCount}
+              showLegacyChip={showWindow && windowDays > 7}
+            />
+          );
+        })}
       </div>
     </section>
   );

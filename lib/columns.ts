@@ -43,7 +43,8 @@ export function assignTrendsToColumns(
 
   // Phase 1: claim phase — only non-observer columns participate.
   for (const col of priorityOrderedColumns(cols)) {
-    const matches = applyColumnFilter(col, trends, claimed);
+    let matches = applyColumnFilter(col, trends, claimed);
+    if (col.filters.clusterSimilar) matches = clusterByBrandKeyword(matches);
     result.set(col.id, matches);
     for (const t of matches) claimed.add(t.id);
   }
@@ -52,7 +53,9 @@ export function assignTrendsToColumns(
   // independent of what other columns claimed.
   for (const col of cols) {
     if (!OBSERVER_TYPES.has(col.type)) continue;
-    result.set(col.id, applyColumnFilter(col, trends));
+    let matches = applyColumnFilter(col, trends);
+    if (col.filters.clusterSimilar) matches = clusterByBrandKeyword(matches);
+    result.set(col.id, matches);
   }
 
   return result;
@@ -117,6 +120,10 @@ export function applyColumnFilter(
     if (typeof f.windowHours === 'number') {
       const ageHours = (Date.now() - new Date(t.firstSeenAt).getTime()) / 3_600_000;
       if (ageHours > f.windowHours) return false;
+    }
+    if (typeof f.windowDays === 'number') {
+      const ageDays = (Date.now() - new Date(t.firstSeenAt).getTime()) / (24 * 3_600_000);
+      if (ageDays > f.windowDays) return false;
     }
     if (typeof f.minVelocity === 'number' && t.velocity < f.minVelocity) return false;
     if (typeof f.minReach === 'number' && t.reach < f.minReach) return false;
@@ -216,6 +223,71 @@ function pick(t: Trend, k: ColumnConfig['sort']['key']): number {
   if (k === 'reach') return Number(t.reach);
   // numeric Scores key
   return (t.scores[k as keyof typeof t.scores] as number) ?? 0;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Clustering — collapse trends that share the same matchedBrandKeywords
+// AND fall within the same 24h bucket into one canonical card.
+//
+// Rationale: if "Tecno POVA Curve 2 launches" gets covered by 4 news
+// outlets within a day, the operator wants to see one card with "+3
+// more" not 4 separate cards. The canonical = highest engagement
+// (velocity*reach combined). The merged Trend keeps the canonical row
+// but exposes `_clusterCount` and `_clusterMembers` (UI uses these to
+// render the +N chip and a sub-list).
+//
+// Used only when ColumnFilters.clusterSimilar=true (Brand Matches).
+// ──────────────────────────────────────────────────────────────────────
+
+export type ClusteredTrend = Trend & {
+  _clusterCount?: number;
+  _clusterMembers?: Trend[];
+};
+
+export function clusterByBrandKeyword(trends: Trend[]): ClusteredTrend[] {
+  if (trends.length === 0) return [];
+  const buckets = new Map<string, Trend[]>();
+
+  for (const t of trends) {
+    // Cluster key: normalized brand-keyword set + day bucket.
+    // Trends sharing keywords "pova,curve" within the same calendar day
+    // all collapse into one cluster.
+    const kw = (t.matchedBrandKeywords ?? []).slice().sort().join('|');
+    if (!kw) {
+      // No matched keywords (legacy row or noise) — render as-is, no cluster.
+      buckets.set(`solo:${t.id}`, [t]);
+      continue;
+    }
+    const dayBucket = Math.floor(new Date(t.firstSeenAt).getTime() / (24 * 3_600_000));
+    const key = `${kw}:${dayBucket}`;
+    const list = buckets.get(key) ?? [];
+    list.push(t);
+    buckets.set(key, list);
+  }
+
+  const out: ClusteredTrend[] = [];
+  for (const list of buckets.values()) {
+    if (list.length === 1) {
+      out.push(list[0]);
+      continue;
+    }
+    // Pick canonical: highest velocity × reach signal. Ties broken by
+    // newest firstSeenAt.
+    const sorted = [...list].sort((a, b) => {
+      const aScore = a.velocity * (Number(a.reach) || 1);
+      const bScore = b.velocity * (Number(b.reach) || 1);
+      if (bScore !== aScore) return bScore - aScore;
+      return new Date(b.firstSeenAt).getTime() - new Date(a.firstSeenAt).getTime();
+    });
+    const canonical = sorted[0];
+    const others = sorted.slice(1);
+    out.push({
+      ...canonical,
+      _clusterCount: others.length,
+      _clusterMembers: others,
+    });
+  }
+  return out;
 }
 
 export function columnFiltersToQuery(col: ColumnConfig): string {

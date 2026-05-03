@@ -251,6 +251,18 @@ export interface ColumnFilters {
   keywordExclude?: string[];
   /** Time window in hours (default unlimited) */
   windowHours?: number;
+  /** Time window in DAYS — used by the Brand Matches column's
+   *  Today/7d/15d/30d selector. The operator-facing window for
+   *  longitudinal "what's happened with our brand" review. When set,
+   *  trends with firstSeenAt older than `windowDays` are excluded;
+   *  trends within the window but older than 7 days get the LEGACY
+   *  visual treatment on the card. */
+  windowDays?: number;
+  /** When true, cluster trends sharing the same matchedBrandKeywords
+   *  within a 24h bucket — keep the canonical (highest-engagement)
+   *  card and roll the rest into a "+N similar" badge. Only used by
+   *  Brand Matches today; could extend to Competitor Activity. */
+  clusterSimilar?: boolean;
   /** Subreddits when source includes 'reddit' */
   subreddits?: string[];
   /** Hashtags include */

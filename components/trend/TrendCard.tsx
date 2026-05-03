@@ -15,9 +15,16 @@ interface Props {
   active?: boolean;
   onOpen: (id: string) => void;
   onAction: (id: string, type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin') => void;
+  /** When this trend represents a cluster of similar signals, the count
+   *  of merged-in trends. Renders a "+N similar" chip on the card. */
+  clusterCount?: number;
+  /** Show LEGACY chip when the trend is older than 7d. Used only by
+   *  Brand Matches in 15/30-day windows so historical entries are
+   *  visually marked as audit material. */
+  showLegacyChip?: boolean;
 }
 
-export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, onAction }: Props) {
+export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, onAction, clusterCount, showLegacyChip }: Props) {
   // ─────────────────────────────────────────────────────────────────────
   // Hydration-safe time tracking.
   //
@@ -97,6 +104,32 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         <span className="absolute right-1 top-1 text-flare-400 text-2xs font-mono">📌</span>
       )}
 
+      {/* LEGACY chip: trends > 7 days old in a 15/30-day window get a
+          small "this is historical" marker so the operator can quickly
+          tell the difference between today's signals and audit material. */}
+      {showLegacyChip && (() => {
+        const ageDays = (Date.now() - new Date(trend.firstSeenAt).getTime()) / (24 * 3_600_000);
+        if (ageDays <= 7) return null;
+        return (
+          <span className="absolute right-1 top-1 text-2xs font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-ink-700/60 text-ink-400 border border-ink-600/40">
+            legacy {Math.round(ageDays)}d
+          </span>
+        );
+      })()}
+
+      {/* Cluster badge: rendered when this card represents N similar
+          signals merged together. Shown inline next to title; click on
+          the parent card opens the drawer where individual members can
+          be inspected. */}
+      {typeof clusterCount === 'number' && clusterCount > 0 && (
+        <span
+          className="absolute left-1 top-1 text-2xs font-mono px-1.5 py-0.5 rounded bg-flare-500/15 text-flare-400 border border-flare-500/30"
+          title={`+${clusterCount} similar signals merged`}
+        >
+          +{clusterCount}
+        </span>
+      )}
+
       {/* row 1 — meta. Defensive layout: left cluster shrinks, right
           cluster never shrinks. Whitespace-nowrap on the left so the
           source label + time stay on one line; right cluster has the
@@ -142,6 +175,12 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           className="flex-shrink-0 text-flare-400 hover:text-flare-300 text-2xs font-mono tabular-nums"
           title={trend.url ? `Open on ${sourceLabel(trend.source)} ↗` : `Search ${sourceLabel(trend.source)} ↗ (no canonical URL)`}
         >↗</a>
+        {/* Verdict badge sits at the end of the title row — pairs the
+            recommendation directly with what it labels, removes the
+            row-4 ml-auto gap that felt cluttered. */}
+        <span className="ml-auto flex-shrink-0">
+          <RecommendationBadge rec={trend.recommendation} />
+        </span>
       </h3>
 
       {/* row 3 — lineage + Why-Now caption when available. The "why now"
@@ -157,10 +196,10 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         ⤷ {trend.recommendationReason}
       </p>
 
-      {/* row 4 — score chips. Single-row layout; CVS only renders when
-          the value is meaningful (legacy rows persisted before
-          jackingScore existed default to 0 — we hide those to avoid
-          adding a low-signal chip that breaks the row width). */}
+      {/* row 4 — score chips. Recommendation badge moved to the title
+          row (above) so the row-4 layout is just metrics, evenly spaced.
+          CVS only renders when meaningful (>0.04) to avoid clutter on
+          legacy rows that haven't been re-scored. */}
       <div className="flex items-center gap-1 mb-1.5">
         <ScoreChip axis="opp" value={trend.scores.opportunity} />
         {typeof trend.scores.jackingScore === 'number' && trend.scores.jackingScore > 0.04 && (
@@ -169,7 +208,6 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         <ScoreChip axis="fit" value={trend.scores.brandFit} />
         <ScoreChip axis="risk" value={trend.scores.risk} invert />
         <ScoreChip axis="cringe" value={trend.scores.cringe} invert />
-        <span className="ml-auto"><RecommendationBadge rec={trend.recommendation} /></span>
       </div>
 
       {/* row 5 — flags */}
