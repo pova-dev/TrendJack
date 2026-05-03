@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TrendJack — POVA War Room',
+  // Tab title must NOT carry the reference brand — every tenant sees
+  // it. Round 4 audit found "POVA War Room" rendering for non-POVA
+  // operators. Per-tenant title personalization should happen via
+  // the brand's name in a child layout if needed.
+  title: 'TrendJack — Trend War Room',
   description: 'Real-time trend hijacking command center',
   manifest: '/manifest.webmanifest',
   themeColor: '#0a0a10',

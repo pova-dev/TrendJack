@@ -125,7 +125,10 @@ function toSignal(v: IvVideo, competitorSet: Set<string>, lineage: string): RawS
     firstSeenAt: pub,
     velocity: (v.viewCount ?? 0) / Math.max(1, ageHours) / 100,
     reach: v.viewCount ?? 0,
-    sentiment: 0.1,
+    // Sentiment: YouTube doesn't expose sentiment via public APIs (and
+    // Invidious mirrors don't either). Previous 0.1 constant was a
+    // baseless prior; emit 0.
+    sentiment: 0,
     competitorClaimants,
     formatFatigue: 0.1,
     url: `https://www.youtube.com/watch?v=${v.videoId}`,

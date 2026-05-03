@@ -65,6 +65,12 @@ export class XOfficialConnector implements Connector {
           const blob = t.text.toLowerCase();
           const competitorClaimants = [...competitorSet].filter(c => blob.includes(c));
           const author = userMap.get(t.author_id ?? '');
+          // Reach: use real impression_count when X returns it (Basic+ tier
+          // only, and only for the requesting user's own tweets — usually
+          // undefined for searched tweets). The previous fallback
+          // `engagement * 10` was pure fabrication of a 10x multiplier and
+          // violated CLAUDE.md hard rule 1; emit 0 instead so the UI
+          // renders '—' for tweets without true impression data.
           signals.push({
             source: 'x',
             title: t.text.split('\n')[0].slice(0, 200),
@@ -74,7 +80,7 @@ export class XOfficialConnector implements Connector {
             lineage: `${author?.username ? '@' + author.username : 'X user'} · ${engagement} interactions in ${ageHours.toFixed(1)}h.`,
             firstSeenAt: pub,
             velocity: engagement / ageHours,
-            reach: m.impression_count ?? engagement * 10,
+            reach: m.impression_count ?? 0,
             sentiment: 0,
             competitorClaimants,
             formatFatigue: 0.05,

@@ -40,7 +40,214 @@ export interface DraftGenErr {
 }
 export type DraftGenResult = DraftGenOk | DraftGenErr;
 
-const SYSTEM_PROMPT = `
+// Category-aware exemplar bank. The system prompt previously hard-coded
+// 4 smartphone vignettes ("5000mAh", "phones that survive", "realme",
+// "sandwich press") that biased EVERY tenant's drafts toward
+// consumer-electronics cadence — Vault Fintech got smartphone-flavored
+// drafts whenever they configured an Anthropic key. Round 4 fix: pull
+// exemplars from a category bucket at request time so Claude sees
+// vignettes from the brand's actual vertical.
+//
+// Each bucket has 3 exemplar trends with ✓ great-copy + ✗ failure-mode
+// lines. Keep the same shape as the original block so the prompt's
+// "WHY THE GREAT EXAMPLES WORK" rules still apply uniformly.
+
+interface CategoryExemplar { trend: string; good: string[]; bad: string[] }
+
+const EXEMPLARS_TECH: CategoryExemplar[] = [
+  {
+    trend: '"Battery anxiety is the new range anxiety"  (X thread, tech)',
+    good: [
+      '"5000mAh is the new minimum. anyone shipping less in 2026 is shipping last year."',
+      '"battery is the spec that actually changes your life."',
+    ],
+    bad: [
+      '"Unleash all-day power!"                       — cringe + banned phrase',
+      '"Industry-leading battery life."                — corporate sludge',
+    ],
+  },
+  {
+    trend: '"Phone overheats in 18 minutes of gaming"  (Reddit gripe)',
+    good: [
+      '"performance you can\'t sustain isn\'t performance."',
+    ],
+    bad: ['"Game on with our cool tech."                   — corny'],
+  },
+  {
+    trend: '"Competitor X launches new flagship"  (competitor)',
+    good: ['"good launch. now do battery."                  — sharp, brief, on-POV'],
+    bad: ['"Welcome to the arena, X."                       — smarmy'],
+  },
+];
+
+const EXEMPLARS_FASHION: CategoryExemplar[] = [
+  {
+    trend: '"Sneaker drops are dead, comfort is back"  (X thread, fashion)',
+    good: [
+      '"hype cycles end. heels do not."',
+      '"we built a shoe for the second mile, not the unboxing video."',
+    ],
+    bad: [
+      '"Step into your power!"                         — cringe + banned phrase',
+      '"Industry-leading comfort technology."           — agency-speak',
+    ],
+  },
+  {
+    trend: '"Quiet luxury is over"  (TikTok format)',
+    good: ['"loud-quiet-loud is a music genre, not a wardrobe strategy."'],
+    bad: ['"Express your authentic self."                 — generic'],
+  },
+  {
+    trend: '"Competitor X drops a sustainable line"  (competitor)',
+    good: ['"good move. now publish the supplier list."'],
+    bad: ['"Welcome to the conversation, X."             — smarmy'],
+  },
+];
+
+const EXEMPLARS_FINANCE: CategoryExemplar[] = [
+  {
+    trend: '"Gig workers can\'t access traditional banking"  (X thread, finance)',
+    good: [
+      '"a 10-hour gap between work and pay isn\'t \'instant\'."',
+      '"if your bank treats variable income as suspicious, it isn\'t a bank for the modern workforce."',
+    ],
+    bad: [
+      '"Unlock financial freedom!"                     — cringe + likely banned phrase',
+      '"Industry-leading payment infrastructure."        — corporate sludge',
+    ],
+  },
+  {
+    trend: '"Buy-now-pay-later interest rates draw scrutiny"  (news)',
+    good: ['"every \'no fees\' product has a fee. ours is named on the receipt."'],
+    bad: ['"Take control of your money!"                  — cringe'],
+  },
+  {
+    trend: '"Competitor X announces consumer credit product"  (competitor)',
+    good: ['"good product. now publish the default rates."'],
+    bad: ['"A new era of fintech."                         — banned phrase territory'],
+  },
+];
+
+const EXEMPLARS_HOME: CategoryExemplar[] = [
+  {
+    trend: '"Maximalism is back"  (X thread, home / lifestyle)',
+    good: [
+      '"a house is a record of decisions. minimalism was a phase, not a policy."',
+      '"the room with the most personality wins."',
+    ],
+    bad: [
+      '"Express your unique style!"                    — generic',
+      '"Transform your space, transform your life."     — banned phrase + cringe',
+    ],
+  },
+  {
+    trend: '"Quiet candle scents are out"  (TikTok)',
+    good: ['"a candle should be a room, not a hint."'],
+    bad: ['"Light up your space with magic."              — corny'],
+  },
+  {
+    trend: '"Competitor X launches collaboration"  (competitor)',
+    good: ['"good drop. the gloss finish ages, though."'],
+    bad: ['"Welcome to the table, X."                     — smarmy'],
+  },
+];
+
+const EXEMPLARS_B2B: CategoryExemplar[] = [
+  {
+    trend: '"Warehouse-ops teams are drowning in dashboards"  (LinkedIn thread)',
+    good: [
+      '"if your ops team has 4 dashboards open, the dashboards are the problem."',
+      '"a 30-second inventory scan beats a 5-minute report nobody reads."',
+    ],
+    bad: [
+      '"Empower your workforce!"                       — cringe + banned phrase',
+      '"Industry-leading operational excellence."        — corporate sludge',
+    ],
+  },
+  {
+    trend: '"Peak-season hiring is breaking 3PLs"  (LinkedIn)',
+    good: ['"the throughput problem is a routing problem disguised as a labor problem."'],
+    bad: ['"Power through peak season!"                   — slogan, no POV'],
+  },
+  {
+    trend: '"Competitor X raises Series B"  (competitor)',
+    good: ['"good round. the integration backlog is now their problem."'],
+    bad: ['"Congratulations to the team!"                  — vacuous'],
+  },
+];
+
+const EXEMPLARS_HEALTH: CategoryExemplar[] = [
+  {
+    trend: '"Wellness is a consumption problem"  (X thread)',
+    good: [
+      '"a 12-step morning routine isn\'t self-care. it\'s a part-time job."',
+      '"if your supplement aisle has 47 brands, the system is the problem."',
+    ],
+    bad: [
+      '"Unleash your healthiest self!"                 — cringe + banned phrase',
+      '"Industry-leading wellness solutions."            — agency-speak',
+    ],
+  },
+  {
+    trend: '"Cold plunges aren\'t magic"  (creator thread)',
+    good: ['"the second-best workout is the one you\'ll actually do twice."'],
+    bad: ['"Transform your wellness journey!"            — banned phrase'],
+  },
+  {
+    trend: '"Competitor X launches premium tier"  (competitor)',
+    good: ['"good tier. the membership churn data tells the real story."'],
+    bad: ['"Welcome to the wellness revolution."          — slogan'],
+  },
+];
+
+const EXEMPLARS_GENERIC: CategoryExemplar[] = [
+  {
+    trend: '"Audience X is making a specific complaint"  (community thread)',
+    good: [
+      '"the complaint is the spec. take it literally."',
+      '"a 5-line review beats a 5-paragraph press release."',
+    ],
+    bad: [
+      '"Unleash your potential!"                       — cringe + banned phrase',
+      '"Industry-leading [whatever]."                    — corporate sludge',
+    ],
+  },
+  {
+    trend: '"Competitor X launches a flagship feature"  (competitor)',
+    good: ['"good launch. now do the part nobody loves shipping."'],
+    bad: ['"Welcome to the conversation."                 — smarmy'],
+  },
+  {
+    trend: '"A new format is dominating the platform"  (cultural moment)',
+    good: ['"the format is the message. the message is what you say next."'],
+    bad: ['"Riding the wave of change!"                  — slogan'],
+  },
+];
+
+function exemplarsForCategory(category: string | undefined): CategoryExemplar[] {
+  const c = (category ?? '').toLowerCase();
+  if (/(phone|smartphone|laptop|gadget|electronics|tech|hardware|device|app|ai\b)/.test(c) && !/(saas|enterprise|b2b|warehouse|ops|hr|crm|erp)/.test(c)) {
+    return EXEMPLARS_TECH;
+  }
+  if (/(b2b|enterprise|warehouse|logistics|hr|crm|erp|saas|software)/.test(c)) return EXEMPLARS_B2B;
+  if (/(fintech|finance|bank|invest|crypto|wealth|loan|payment|insurance)/.test(c)) return EXEMPLARS_FINANCE;
+  if (/(fashion|apparel|footwear|shoe|sneaker|clothing|streetwear|luxury|jewelry|cosmetic|beauty)/.test(c)) return EXEMPLARS_FASHION;
+  if (/(home|decor|furniture|candle|ceramic|kitchen|bedding|garden|dtc home)/.test(c)) return EXEMPLARS_HOME;
+  if (/(health|wellness|fitness|nutrition|pharma|medical|supplement|telehealth)/.test(c)) return EXEMPLARS_HEALTH;
+  return EXEMPLARS_GENERIC;
+}
+
+function renderExemplars(category: string | undefined): string {
+  const bank = exemplarsForCategory(category);
+  return bank.map(ex => {
+    const goodLines = ex.good.map(g => `✓ ${g}`).join('\n');
+    const badLines = ex.bad.map(b => `✗ ${b}`).join('\n');
+    return `Trend: ${ex.trend}\n${goodLines}\n${badLines}`;
+  }).join('\n\n');
+}
+
+function buildSystemPrompt(brand: BrandProfile): string {
+  return `
 You are a senior reactive-marketing copywriter. You write the kind of copy
 that screenshots get pinned to design-team Slacks. Not agency copy. Not
 corporate copy. Copy that sounds like a sharp, confident person who has a
@@ -48,32 +255,11 @@ strong POV — not a brand pretending to have one.
 
 ═══════════════════════════════════════════════════════════════════════════
 WHAT GREAT COPY LOOKS LIKE — internalize the rhythm
+(Examples are from the brand's category to keep the cadence relevant.
+The structural rules below apply regardless of vertical.)
 ═══════════════════════════════════════════════════════════════════════════
 
-Trend: "Battery anxiety is the new range anxiety"  (X thread, tech)
-✓ "5000mAh is the new minimum. anyone shipping less in 2026 is shipping last year."
-✓ "we don't do flagship killers. we do phones that survive."
-✓ "battery is the spec that actually changes your life."
-✗ "Unleash all-day power!"                       — cringe + banned phrase
-✗ "Industry-leading battery life."                — corporate sludge
-✗ "Level up your battery game."                   — forced slang + banned
-
-Trend: "Drop test on a budget phone"  (TikTok format)
-✓ "the cheapest test you can run is 'is the screen still there'."
-✓ "our phones aren't drop-tested. they're auto-rickshaw-tested."
-✗ "Built for adventurers!"                        — generic agency-speak
-✗ "Crushing it under pressure."                   — banned phrase
-
-Trend: "Realme launches GT 7 Pro"  (competitor)
-✓ "good launch. now do battery."                  — sharp, brief, on-POV
-✓ "we're not racing realme on chips. we're racing them on the bus home."
-✗ "Welcome to the arena, realme."                 — smarmy
-✗ "A real game changer for the segment."          — banned phrase + cringe
-
-Trend: "Phone overheats in 18 minutes of gaming"  (Reddit gripe)
-✓ "if your phone is a sandwich press in 20 min, you didn't buy a phone."
-✓ "performance you can't sustain isn't performance."
-✗ "Game on with our cool tech."                   — corny
+${renderExemplars(brand.category)}
 
 ═══════════════════════════════════════════════════════════════════════════
 WHY THE GREAT EXAMPLES WORK
@@ -81,11 +267,10 @@ WHY THE GREAT EXAMPLES WORK
 - Specific number, name, or scene — never generic outcomes.
 - Short. Most great hooks are 6-12 words.
 - Confident POV, not cheerleading.
-- Reference the actual thing in the trend — battery, drop test, realme,
-  sandwich press. NOT "your experience" or "performance".
+- Reference the actual thing in the trend, not a generic outcome.
 - Punchy rhythm — the period is a weapon.
 - Lowercase often beats Title Case for sharp voices (read brand profile).
-- Honest > superlative. "good launch. now do battery." beats "best phone ever."
+- Honest > superlative. Concrete observation beats "best ever".
 - Never write a line that could appear unchanged on a competitor's feed.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -100,7 +285,7 @@ VARIANT INTELLIGENCE — not every trend warrants every variant
   Hard news / political / tragedy → SKIP — banned topic
   Regulation / policy update      → safe carousel only
   Creator / influencer thread     → safe, meme, reel
-  Spec-debate / community gripe   → bold, meme                 (have a POV)
+  Community gripe / debate        → bold, meme                 (have a POV)
   Trending search query           → SKIP unless directly relevant
 
 If the trend is inherently un-actionable for THIS brand (banned topic,
@@ -146,8 +331,9 @@ HARD RULES — never break
   number / name / handle / date / entity. Generic outcome prose like
   "upgrade your experience" is a failure mode.
 - Each draft distinctly different in angle, register, length. No filler.
-- whatNotToSay = 2-3 traps SPECIFIC to this trend (not generic). e.g.
-  "don't name realme directly", "don't claim 5000mAh without our SKU".
+- whatNotToSay = 2-3 traps SPECIFIC to this trend (not generic). Examples
+  of the right shape: "don't name <competitor> directly",
+  "don't claim <metric> without your own SKU/data".
 - Pick the right platform per draft. Memes belong on X / Reels / TikTok.
   Carousels on Instagram / LinkedIn. Long thoughtful posts on LinkedIn.
 
@@ -159,6 +345,7 @@ Self-check before emitting:
 - Does each hook feel like something a real sharp human would write,
   unprompted, at a bar discussing this trend?
 `.trim();
+}
 
 // Hook descriptions used to guide the AI when the operator picks a
 // specific angle. Mirrors src/agents/creative/hooks.ts but inlined so
@@ -260,7 +447,7 @@ Generate the drafts now. STRICT JSON only.`;
 
   const ai = await runChat({
     tier,
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(brand),
     messages: [{ role: 'user', content: userPayload }],
     // 6 drafts × ~250 tokens each + variantsSkipped reasons + skip block
     // ≈ 2.4k. Use 4000 to leave generous headroom — JSON output is sticky
