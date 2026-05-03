@@ -44,7 +44,7 @@ interface Props {
   onAction: (id: string, type: 'save' | 'dismiss' | 'generate' | 'assign' | 'pin') => void;
 }
 
-type TabKey = 'overview' | 'scores' | 'drafts' | 'lineage' | 'research';
+type TabKey = 'overview' | 'scores' | 'drafts' | 'lineage' | 'research' | 'battle';
 
 interface VerifiedClaimRender {
   id: string;
@@ -99,6 +99,12 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
   const [iotErr, setIotErr] = React.useState<string | null>(null);
   const [iotLoading, setIotLoading] = React.useState(false);
 
+  // Battle-Card state — only relevant for trends with competitorClaimed=true.
+  // Lazy-loaded when the operator opens the Battle tab.
+  const [battleCard, setBattleCard] = React.useState<BattleCardPayload | null>(null);
+  const [battleLoading, setBattleLoading] = React.useState(false);
+  const [battleErr, setBattleErr] = React.useState<string | null>(null);
+
   // Deep lineage probe
   const [lineage, setLineage] = React.useState<unknown | null>(null);
   const [probingLineage, setProbingLineage] = React.useState(false);
@@ -106,7 +112,45 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
   React.useEffect(() => {
     setTab('overview'); setDrafts(null); setResearch(null); setHistory(null); setLineage(null);
     setIot(null); setIotErr(null);
+    setBattleCard(null); setBattleErr(null);
   }, [trend?.id]);
+
+  // Lazy-load existing battle-card when Battle tab opens.
+  React.useEffect(() => {
+    if (!trend || tab !== 'battle' || battleCard !== null || battleLoading) return;
+    let cancelled = false;
+    setBattleLoading(true);
+    fetch(`/api/trends/${trend.id}/battle-card`)
+      .then(async r => {
+        if (cancelled) return;
+        if (r.status === 404) return; // no card yet — operator will click Generate
+        if (!r.ok) { setBattleErr(`http_${r.status}`); return; }
+        const j = await r.json();
+        setBattleCard(j);
+      })
+      .catch(e => { if (!cancelled) setBattleErr((e as Error).message); })
+      .finally(() => { if (!cancelled) setBattleLoading(false); });
+    return () => { cancelled = true; };
+  }, [trend?.id, tab, battleCard, battleLoading]);
+
+  async function handleGenerateBattleCard() {
+    if (!trend) return;
+    setBattleLoading(true);
+    setBattleErr(null);
+    try {
+      const res = await fetch(`/api/trends/${trend.id}/battle-card`, { method: 'POST' });
+      const j = await res.json();
+      if (!res.ok) {
+        setBattleErr(j?.message || j?.error || `http_${res.status}`);
+      } else {
+        setBattleCard(j);
+      }
+    } catch (e) {
+      setBattleErr((e as Error).message);
+    } finally {
+      setBattleLoading(false);
+    }
+  }
 
   // Real Google Trends interest-over-time fetch — gtrends trends only.
   // Maps the drawer's range chip to Google's time-range tokens.
@@ -237,6 +281,9 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
             { value: 'scores',   label: 'Scores' },
             { value: 'drafts',   label: 'Drafts',   count: drafts?.length },
             { value: 'research', label: 'Research', count: research?.sources?.length },
+            ...(trend.competitorClaimed
+              ? [{ value: 'battle', label: 'Battle' } as const]
+              : []),
             { value: 'lineage',  label: 'Lineage' },
           ]}
           className="px-3"
@@ -260,6 +307,7 @@ export function DetailDrawer({ trend, open, onClose, onAction }: Props) {
           {tab === 'scores'   && <ScoresTab trend={trend} />}
           {tab === 'drafts'   && <DraftsTab result={draftsResult} generating={generating} onGenerate={handleGenerate} />}
           {tab === 'research' && <ResearchTab data={research} loading={researching} onRun={handleResearch} />}
+          {tab === 'battle'   && <BattleTab card={battleCard} loading={battleLoading} err={battleErr} onGenerate={handleGenerateBattleCard} />}
           {tab === 'lineage'  && <LineageTab trend={trend} probe={lineage} loading={probingLineage} onProbe={handleLineage} />}
         </div>
 
@@ -365,6 +413,17 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
         )}
       </Section>
 
+      {/* Trajectory — Predictive Virality Phase 2. Renders the forecast in
+          operator-readable form: current phase, predicted peak time
+          (relative), and confidence. Only when forecastPeak has produced
+          a result (≥3 samples). The TrendCard pill is a scan-level
+          summary; this is the deeper read. */}
+      {trend.cascadePhase && trend.predictedPeakConfidence !== undefined && trend.predictedPeakConfidence > 0 && (
+        <Section title="Trajectory">
+          <TrajectoryView trend={trend} />
+        </Section>
+      )}
+
       <Section title="Recommendation"><p>{trend.recommendationReason}</p></Section>
       {/* Score snapshot intentionally NOT rendered here. The TrendCard
           already shows OPP/FIT/RISK/CRINGE at scan-level; the dedicated
@@ -398,6 +457,182 @@ function OverviewTab({ trend, research, researching, onResearch, history, histor
           ResearchPanel rendered twice (P0b from the Trinity Swarm
           Visual Auditor). */}
       <ResearchSummaryStrip research={research} loading={researching} />
+    </>
+  );
+}
+
+// ─── Battle-Card types + tab ──────────────────────────────────────────────
+interface BattleCardAngleRender { angle: string; rationale: string; exampleHook: string }
+interface BattleCardPayload {
+  id: string;
+  trendId: string;
+  verdict: 'counter' | 'ignore' | 'out-flank' | 'monitor';
+  verdictReason: string;
+  payload: {
+    angleOptions: BattleCardAngleRender[];
+    counterClaim: string | null;
+    doNotDo: string[];
+    saturationScore: number;
+    competitorClaimants: string[];
+    provider?: string;
+    model?: string;
+  };
+  generatedAt: string;
+  promptVersion?: string;
+}
+
+function BattleTab({ card, loading, err, onGenerate }: {
+  card: BattleCardPayload | null;
+  loading: boolean;
+  err: string | null;
+  onGenerate: () => void;
+}) {
+  if (loading && !card) {
+    return <p className="text-2xs text-ink-400 italic">Working on the battle card…</p>;
+  }
+  if (!card) {
+    return (
+      <Section title="Battle Card">
+        <p className="text-xs text-ink-300">
+          A competitor has claimed this trend. Generate a structured Win/Loss
+          card — verdict, angle options, counter-claim, do-not-do moves —
+          via premium AI.
+        </p>
+        {err && <p className="text-2xs text-bad-400 mt-1">{err === 'budget_exhausted' ? 'Daily AI budget exhausted for this org.' : `Error: ${err}`}</p>}
+        <div className="mt-2">
+          <Button size="sm" onClick={onGenerate}>✦ Generate battle card</Button>
+        </div>
+      </Section>
+    );
+  }
+  const verdictTone =
+    card.verdict === 'counter'   ? 'good' :
+    card.verdict === 'out-flank' ? 'flare' :
+    card.verdict === 'monitor'   ? 'info' :
+                                   'warn';
+  return (
+    <>
+      <Section title="Verdict">
+        <div className="flex items-center gap-2">
+          <Chip tone={verdictTone} className="uppercase tracking-wider">{card.verdict}</Chip>
+          <span className="text-2xs text-ink-400 font-mono">
+            saturation {Math.round(card.payload.saturationScore * 100)}%
+          </span>
+        </div>
+        <p className="mt-2 text-ink-100">{card.verdictReason}</p>
+        {card.payload.competitorClaimants.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {card.payload.competitorClaimants.map(c => (
+              <Chip key={c} tone="bad">{c}</Chip>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {card.payload.counterClaim && (
+        <Section title="Counter-claim">
+          <blockquote className="border-l-2 border-flare-500 pl-2 text-ink-100 italic">
+            {card.payload.counterClaim}
+          </blockquote>
+        </Section>
+      )}
+
+      {card.payload.angleOptions.length > 0 && (
+        <Section title={`Angle options (${card.payload.angleOptions.length})`}>
+          <div className="space-y-2">
+            {card.payload.angleOptions.map((a, i) => (
+              <div key={i} className="rounded-md border border-ink-700 bg-ink-900 p-2">
+                <p className="text-ink-100 font-semibold">{a.angle}</p>
+                <p className="text-2xs text-ink-300 mt-0.5">{a.rationale}</p>
+                {a.exampleHook && (
+                  <p className="text-2xs text-flare-400/80 mt-1 italic">→ {a.exampleHook}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {card.payload.doNotDo.length > 0 && (
+        <Section title="Do not do">
+          <ul className="space-y-0.5 text-ink-200">
+            {card.payload.doNotDo.map((d, i) => (
+              <li key={i} className="flex gap-1.5">
+                <span className="text-bad-400 flex-shrink-0">✗</span>
+                <span>{d}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <Section title="Card metadata">
+        <p className="text-2xs text-ink-400">
+          Generated {new Date(card.generatedAt).toLocaleString()}
+          {card.payload.provider && ` · ${card.payload.provider}/${card.payload.model}`}
+          {card.promptVersion && ` · prompt ${card.promptVersion}`}
+        </p>
+        <div className="mt-1.5">
+          <Button size="sm" variant="outline" onClick={onGenerate}>↻ Regenerate</Button>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+// ─── Trajectory view (Predictive Virality Phase 2) ────────────────────────
+function TrajectoryView({ trend }: { trend: Trend }) {
+  // Hydration-safe `now` per CLAUDE.md rule #10. Predicted peak
+  // time relative to wall-clock — must not run during SSR.
+  const [now, setNow] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const phase = trend.cascadePhase!;
+  const conf = trend.predictedPeakConfidence ?? 0;
+  const phaseLabel =
+    phase === 'fast-growing-initial' ? 'Growing' :
+    phase === 'peaking'              ? 'Peaking' :
+    phase === 'decaying'             ? 'Decaying' :
+                                       phase;
+  const phaseTone =
+    phase === 'fast-growing-initial' ? 'good' :
+    phase === 'peaking'              ? 'flare' :
+    phase === 'decaying'             ? 'warn' :
+                                       'neutral';
+  const advice =
+    phase === 'fast-growing-initial' ? 'Action window is open. Earlier is better.' :
+    phase === 'peaking'              ? 'Approaching peak — post within the next few hours or hold.' :
+    phase === 'decaying'             ? 'Past the peak. New takes underperform — pivot or skip.' :
+                                       'Insufficient samples for a reliable read.';
+
+  // Predicted peak countdown
+  let peakCopy: string = '—';
+  if (now != null && trend.predictedPeakAt) {
+    const dtH = (new Date(trend.predictedPeakAt).getTime() - now) / 3_600_000;
+    if (dtH > 1)         peakCopy = `predicted peak in ${dtH.toFixed(1)}h`;
+    else if (dtH > 0)    peakCopy = `predicted peak in ${Math.round(dtH * 60)}m`;
+    else if (dtH > -2)   peakCopy = `predicted peak just now (${Math.abs(Math.round(dtH * 60))}m ago)`;
+    else                 peakCopy = `predicted peak ${Math.abs(dtH).toFixed(1)}h ago`;
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Chip tone={phaseTone} className="uppercase tracking-wider">{phaseLabel}</Chip>
+        <span className="text-2xs font-mono text-ink-300">{Math.round(conf * 100)}% conf</span>
+        <span className="text-2xs text-ink-400">·</span>
+        <span className="text-2xs text-ink-300">{peakCopy}</span>
+      </div>
+      <p className="text-2xs text-ink-300/80 italic">{advice}</p>
+      {conf < 0.4 && (
+        <p className="text-2xs text-ink-400 mt-1">
+          Low confidence — based on a small sample. Re-check after the next ingest tick.
+        </p>
+      )}
     </>
   );
 }
