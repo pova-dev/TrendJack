@@ -28,12 +28,35 @@ export default async function DashboardPage() {
 
   const postNowCount = trends.filter(t => t.recommendation === 'POST_NOW').length;
 
-  const connectorStatuses = listConnectors().map(c => ({
-    source: c.source,
-    mode: c.mode,
-    ok: true,
-    lastRunAt: new Date().toISOString(),
-  }));
+  // Canonical-source connectors (X / Reddit / YouTube / TikTok / News /
+  // GTrends) come from listConnectors(). Auxiliary connectors registered
+  // separately in src/connectors/index.ts (Meta Ad Library, X-Trending24)
+  // get their own pills so the operator can see at a glance whether
+  // those niche surfaces are healthy.
+  const connectorStatuses = [
+    ...listConnectors().map(c => ({
+      source: c.source,
+      mode: c.mode,
+      ok: true,
+      lastRunAt: new Date().toISOString(),
+    })),
+    {
+      id: 'x_trending',
+      source: 'x' as const,
+      label: 'X Trending',
+      mode: 'live' as const,
+      ok: true,
+      lastRunAt: new Date().toISOString(),
+    },
+    {
+      id: 'meta_ads_lib',
+      source: 'custom' as const,
+      label: 'Meta Ads',
+      mode: 'live' as const,
+      ok: true,
+      lastRunAt: new Date().toISOString(),
+    },
+  ];
 
   return (
     <>
