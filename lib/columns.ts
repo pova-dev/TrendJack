@@ -287,19 +287,29 @@ export function applyColumnFilter(
     //
     // Quarantine columns (risk_watch, compliance_hold, crisis_watch,
     // alerts) opt out of this rule and see everything.
+    //
+    // Competitor-tracking surfaces (Meta Ad Library, X-Trending competitor
+    // activity, etc.) ALSO bypass the topicalFit gate. They are BY DESIGN
+    // about competitors, not brand-fit — the signal "Realme · Meta Ad
+    // Library" never mentions our brand's keywords, so topicalFit is
+    // always 0. Without this carve-out, the entire Meta Ad Library
+    // column auto-quarantines and shows empty (Round 5 finding).
     const QUARANTINE_COLUMN_TYPES = new Set([
       'risk_watch', 'compliance_hold', 'crisis_watch', 'alerts',
     ]);
+    const isCompetitorTracking = t.source === 'custom' && t.competitorClaimants.length > 0;
     if (!QUARANTINE_COLUMN_TYPES.has(col.type)) {
       // ESCALATE always quarantined — needs human review.
       if (t.recommendation === 'ESCALATE')        return false;
       // Hard risk floor — election rally et al.
       if (t.scores.risk >= 0.7)                   return false;
-      // Banned-topic hits — engine zeros topicalFit.
-      if (t.scores.topicalFit === 0)              return false;
+      // Banned-topic hits — engine zeros topicalFit. Competitor-tracking
+      // surfaces are exempt (their topicalFit=0 is structural, not toxic).
+      if (!isCompetitorTracking && t.scores.topicalFit === 0) return false;
       // Cringe trap — engine flags as IGNORE; we hide it from main lanes.
       if (t.scores.cringe > 0.7)                  return false;
-      // Already claimed by 2+ competitors — dilutive to chase.
+      // Already claimed by 2+ competitors — dilutive to chase. Doesn't
+      // apply to single-competitor tracking cards (1 claimant each).
       if (t.competitorClaimants.length >= 2)      return false;
       // NOTE: plain IGNORE due to low brand-fit IS shown in main columns.
       // Operators want peripheral awareness — they may pivot a low-fit
@@ -315,8 +325,15 @@ export function applyColumnFilter(
     // Pinned trends and the dedicated Pinned Watchlist column are exempt:
     // pinning means "I want to track this long-term", which is the whole
     // point of opting out of decay-decay.
-    if (col.type !== 'decay_watch' && !f.decay && !f.pinnedOnly && !t.pinned) {
-      const peak = t.peakWindowEnd ? new Date(t.peakWindowEnd).getTime() : 0;
+    //
+    // peakWindowEnd null = forecastPeak couldn't predict (fewer than 3
+    // TrendSample rows yet). In that case we don't know the trend's
+    // lifetime, so we MUST skip the decay filter — otherwise the ratio
+    // math collapses to (elapsed_ms / 1) which is always >> 0.7 and the
+    // trend gets filtered out moments after emission. This was the
+    // root cause of the Meta Ad Library column showing empty (Round 5).
+    if (col.type !== 'decay_watch' && !f.decay && !f.pinnedOnly && !t.pinned && t.peakWindowEnd) {
+      const peak = new Date(t.peakWindowEnd).getTime();
       const start = new Date(t.firstSeenAt).getTime();
       const ratio = (now - start) / Math.max(peak - start, 1);
       if (ratio > 0.7) return false;
