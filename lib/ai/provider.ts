@@ -67,7 +67,24 @@ function pick(creds: OrgCredentials | undefined, key: string): string | undefine
   return pickCred(creds, key);
 }
 
-function pickRouting(tier: AiTier, creds?: OrgCredentials): Routing {
+// Audit 2026-05-29 D8 — don't leak "localhost:3000" to OpenRouter from prod.
+// Prefer TRENDJACK_BASE_URL or OPENROUTER_REFERER. Fall back to localhost only
+// when explicitly in non-production.
+export function resolveOpenRouterReferer(): string {
+  const explicit = process.env.OPENROUTER_REFERER || process.env.TRENDJACK_BASE_URL;
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV === 'production') {
+    // No referer is better than a misleading one. OpenRouter accepts the
+    // request without it; analytics will just lump the call under "unknown".
+    return 'https://trendjack.app';
+  }
+  return 'http://localhost:3000';
+}
+
+// Exported for tests. The tier→model decision is what enforces CLAUDE.md
+// hard-rule 3 (no free-tier model behind a user-visible fact), so it needs
+// to be assertable rather than buried.
+export function pickRouting(tier: AiTier, creds?: OrgCredentials): Routing {
   const hasAnthropic  = !!pick(creds, 'ANTHROPIC_API_KEY');
   const hasOpenAI     = !!pick(creds, 'OPENAI_API_KEY');
   const hasGoogle     = !!pick(creds, 'GOOGLE_API_KEY');
@@ -145,12 +162,48 @@ export function getRemainingBudgetUsd(orgId: string | undefined): number {
   return remainingBudget(orgId);
 }
 
+// Wall-clock ceiling on every provider call.
+//
+// Previously NONE of the four fetches below passed a signal. Node's fetch has
+// no default request timeout, so a stalled connection hung forever — and that
+// is not hypothetical: it wedged the Verifier Agent completely. Its handler
+// awaits verify() and only acks on success, so one hung call left the message
+// un-acked with the handler pinned. 6,093 messages piled up on
+// tj.trends.scored, no error was ever logged, and claim verification silently
+// stopped working while the app looked healthy.
+//
+// A timeout turns that silent hang into a normal rejection: the catch in each
+// caller returns { ok: false }, the Verifier's catch logs and declines to ack,
+// the bus redelivers, and the Architect DLQs it if it keeps failing. Loud and
+// recoverable instead of quiet and terminal.
+const DEFAULT_AI_TIMEOUT_MS = 90_000;
+
+function aiTimeoutMs(): number {
+  const raw = Number(process.env.TJ_AI_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_AI_TIMEOUT_MS;
+}
+
+/** AbortSignal that fires after the configured AI timeout. */
+function aiSignal(): AbortSignal {
+  return AbortSignal.timeout(aiTimeoutMs());
+}
+
+/** Normalizes an abort into an operator-legible error string. */
+function aiError(e: unknown): string {
+  const err = e as Error;
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+    return `provider_timeout_after_${aiTimeoutMs()}ms`;
+  }
+  return err?.message ?? 'unknown_error';
+}
+
 async function callAnthropic(model: string, opts: AiRunOptions): Promise<AiResponse> {
   const key = pick(opts.credentials, 'ANTHROPIC_API_KEY');
   if (!key) return { ok: false, error: 'ANTHROPIC_API_KEY missing', provider: 'anthropic' };
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: aiSignal(),
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model,
@@ -164,7 +217,7 @@ async function callAnthropic(model: string, opts: AiRunOptions): Promise<AiRespo
     if (!res.ok) return { ok: false, error: json.error?.message ?? `http_${res.status}`, provider: 'anthropic' };
     const text = (json.content ?? []).filter(c => c.type === 'text').map(c => c.text ?? '').join('').trim();
     return { ok: true, text, provider: 'anthropic', model, inputTokens: json.usage?.input_tokens, outputTokens: json.usage?.output_tokens };
-  } catch (e) { return { ok: false, error: (e as Error).message, provider: 'anthropic' }; }
+  } catch (e) { return { ok: false, error: aiError(e), provider: 'anthropic' }; }
 }
 
 async function callOpenAI(model: string, opts: AiRunOptions): Promise<AiResponse> {
@@ -174,6 +227,7 @@ async function callOpenAI(model: string, opts: AiRunOptions): Promise<AiResponse
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      signal: aiSignal(),
       headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model,
@@ -187,7 +241,7 @@ async function callOpenAI(model: string, opts: AiRunOptions): Promise<AiResponse
     if (!res.ok) return { ok: false, error: json.error?.message ?? `http_${res.status}`, provider: 'openai' };
     const text = json.choices?.[0]?.message?.content?.trim() ?? '';
     return { ok: true, text, provider: 'openai', model, inputTokens: json.usage?.prompt_tokens, outputTokens: json.usage?.completion_tokens };
-  } catch (e) { return { ok: false, error: (e as Error).message, provider: 'openai' }; }
+  } catch (e) { return { ok: false, error: aiError(e), provider: 'openai' }; }
 }
 
 async function callGoogle(model: string, opts: AiRunOptions): Promise<AiResponse> {
@@ -197,6 +251,7 @@ async function callGoogle(model: string, opts: AiRunOptions): Promise<AiResponse
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`, {
       method: 'POST',
+      signal: aiSignal(),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
@@ -215,7 +270,7 @@ async function callGoogle(model: string, opts: AiRunOptions): Promise<AiResponse
     if (!res.ok) return { ok: false, error: json.error?.message ?? `http_${res.status}`, provider: 'google' };
     const text = (json.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('').trim();
     return { ok: true, text, provider: 'google', model, inputTokens: json.usageMetadata?.promptTokenCount, outputTokens: json.usageMetadata?.candidatesTokenCount };
-  } catch (e) { return { ok: false, error: (e as Error).message, provider: 'google' }; }
+  } catch (e) { return { ok: false, error: aiError(e), provider: 'google' }; }
 }
 
 // Stable fallback models we retry against when the user-supplied default
@@ -240,10 +295,12 @@ async function callOpenRouter(model: string, opts: AiRunOptions, attempt = 0): P
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
+      signal: aiSignal(),
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${key}`,
-        'http-referer': process.env.OPENROUTER_REFERER ?? 'http://localhost:3000',
+        // Audit 2026-05-29 D8 — refuse to leak "localhost" from prod.
+        'http-referer': resolveOpenRouterReferer(),
         'x-title': 'TrendJack',
       },
       body: JSON.stringify({
@@ -287,7 +344,7 @@ async function callOpenRouter(model: string, opts: AiRunOptions, attempt = 0): P
       return { ok: false, error: 'openrouter returned empty completion', provider: 'openrouter' };
     }
     return { ok: true, text, provider: 'openrouter', model, inputTokens: json.usage?.prompt_tokens, outputTokens: json.usage?.completion_tokens };
-  } catch (e) { return { ok: false, error: (e as Error).message, provider: 'openrouter' }; }
+  } catch (e) { return { ok: false, error: aiError(e), provider: 'openrouter' }; }
 }
 
 export function aiHealth(creds?: OrgCredentials) {

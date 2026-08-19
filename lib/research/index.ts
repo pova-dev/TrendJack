@@ -19,7 +19,7 @@
 // gets a "no AI yet" state with clickable links instead of blank screen.
 
 import type { Trend } from '@/types';
-import { runChat } from '@/lib/ai/provider';
+import { runChat, resolveOpenRouterReferer } from '@/lib/ai/provider';
 import { pickCred, type OrgCredentials } from '@/lib/credentials';
 
 export interface ResearchSource {
@@ -144,7 +144,7 @@ QUERY: ${query}`;
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${key}`,
-      'http-referer': process.env.OPENROUTER_REFERER ?? 'http://localhost:3000',
+      'http-referer': resolveOpenRouterReferer(),
       'x-title': 'TrendJack',
     },
     body: JSON.stringify({
@@ -236,10 +236,25 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   ${s.url}\n   ${s.snippet ?? ''
   let keyFacts: ResearchResult['keyFacts'] = [];
   let provider = 'none';
   let aiSummarized = false;
+  // Why the AI leg failed, if it did. Previously this was discarded and the
+  // panel unconditionally said "Add an AI provider key" — which is actively
+  // wrong when a valid key IS configured and the provider rejected the call
+  // (out of credit, rate limited, model unavailable). The operator then goes
+  // hunting for a settings problem that doesn't exist.
+  let aiFailure: { provider: string; error: string } | null = null;
 
   if (sources.length > 0) {
     const ai = await runChat({
-      tier: 'balanced',
+      // PREMIUM, not balanced. CLAUDE.md hard-rule 3: "Free-tier LLMs (Llama
+      // etc. via OpenRouter) hallucinate numbers. Use them for triage /
+      // classification only. Drafts and the research panel must use Claude
+      // or GPT-4o." This IS the research panel — its output is user-visible
+      // fact, so it gets the premium tier.
+      //
+      // Cost is bounded: researchTrend() is only reachable from the
+      // on-demand route /api/trends/[id]/research, i.e. one call per
+      // operator click. It is never run in bulk over the trend table.
+      tier: 'premium',
       system: sysPrompt,
       messages: [{ role: 'user', content: userPayload }],
       maxTokens: 700, temperature: 0.4, jsonMode: true,
@@ -253,12 +268,14 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   ${s.url}\n   ${s.snippet ?? ''
         keyFacts = (parsed.keyFacts ?? []).slice(0, 6);
         aiSummarized = !!summary;
       } catch { summary = ai.text.slice(0, 600); aiSummarized = !!summary; }
+    } else {
+      aiFailure = { provider: ai.provider, error: ai.error };
     }
   }
 
   if (!summary) {
     summary = sources.length > 0
-      ? `Found ${sources.length} sources for "${query}" via ${backend}. Add an AI provider key in Settings → AI to get a summary + structured key facts.`
+      ? `Found ${sources.length} sources for "${query}" via ${backend}. ${explainNoSummary(aiFailure)}`
       : `No web sources found for "${query}". Try refining the trend title.`;
   }
 
@@ -422,6 +439,37 @@ function cleanInline(s: string): string {
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+
+/** Turn a runChat failure into something the operator can act on.
+ *
+ *  The distinction that matters: "you have no key" and "your key was
+ *  rejected" need completely different responses, and conflating them sends
+ *  people to the wrong screen. Provider text is passed through (truncated)
+ *  because it is usually the most specific thing available — e.g. OpenRouter's
+ *  402 names the exact remedy. */
+function explainNoSummary(failure: { provider: string; error: string } | null): string {
+  if (!failure) return 'Add an AI provider key in Settings → AI to get a summary + structured key facts.';
+
+  switch (failure.error) {
+    case 'no_ai_key':
+      return 'Add an AI provider key in Settings → AI to get a summary + structured key facts.';
+    case 'budget_exhausted':
+      return 'AI summary skipped — this org has hit its daily AI budget cap. Raise it or wait for the daily reset.';
+    default:
+      break;
+  }
+
+  if (/timeout/i.test(failure.error)) {
+    return `AI summary unavailable — ${failure.provider} did not respond in time. The sources above are still valid.`;
+  }
+  if (/insufficient credit|402/i.test(failure.error)) {
+    return `AI summary unavailable — your ${failure.provider} account is out of credit. Your key is valid; it just needs topping up.`;
+  }
+  if (/rate.?limit|429/i.test(failure.error)) {
+    return `AI summary unavailable — ${failure.provider} is rate-limiting this key. Try again shortly.`;
+  }
+  return `AI summary unavailable — ${failure.provider} rejected the call: ${failure.error.slice(0, 160)}`;
+}
 
 function buildQuery(t: Trend): string {
   const base = t.title.replace(/^#?/, '').replace(/[“”]/g, '"');
