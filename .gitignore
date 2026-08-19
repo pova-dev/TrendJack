@@ -62,3 +62,12 @@ public/uploads/
 
 # generated
 prisma/generated/
+
+# sqlite side-files and recovery dumps. `prisma/*.db` alone misses names like
+# dev.db.broken-1780080252, which is how a 369MB database once reached a commit.
+*.db.broken-*
+*.db.bak*
+prisma/*.db.*
+
+# FUSE orphan handles left by network/virtual mounts
+.fuse_hidden*
