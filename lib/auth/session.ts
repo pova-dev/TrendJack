@@ -29,10 +29,26 @@ function resolveSessionSecret(): string {
   }
   return env || 'dev-only-insecure-secret-please-change-to-32+chars-in-prod';
 }
-const password = resolveSessionSecret();
+
+// Resolved lazily, on first session access — NOT at module load.
+//
+// `next build` imports every route module with NODE_ENV=production to collect
+// page data, so evaluating this at module scope made a production build
+// impossible without a runtime secret. That broke `npm run build` outright and
+// meant the Dockerfile (which builds before SESSION_SECRET is ever supplied)
+// could never produce an image.
+//
+// Deferring keeps CLAUDE.md hard-rule 8 exactly where it belongs — the first
+// real session read/write in a running production server still throws — while
+// letting a secret-less build machine compile the app.
+let cachedSecret: string | undefined;
+function sessionSecret(): string {
+  if (cachedSecret === undefined) cachedSecret = resolveSessionSecret();
+  return cachedSecret;
+}
 
 export const sessionOptions: SessionOptions = {
-  password,
+  get password() { return sessionSecret(); },
   cookieName: 'tj_session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',

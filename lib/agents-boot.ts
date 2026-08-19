@@ -81,6 +81,10 @@ export function bootAgents(): AgentRunState {
     bus,
     onStuck: () => { stuckMessages++; },
     monitorGroups: ['filter-agent', 'verifier-agent', 'push-delivery', 'battlecard-agent', 'calibration-agent', 'composer-agent'],
+    // Single-tenant self-hosters can route DLQ entries to their org's audit
+    // page by setting TJ_DLQ_ORG_ID. Unset (multi-tenant) → stderr only,
+    // since AuditLog rows are org-scoped and infra events belong to none.
+    dlqOrgId: process.env.TJ_DLQ_ORG_ID || undefined,
   });
 
   // Push-delivery worker — subscribes to STREAMS.alerts and fans out
