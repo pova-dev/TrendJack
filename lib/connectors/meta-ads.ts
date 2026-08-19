@@ -31,7 +31,7 @@
 // (parked work).
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 const COUNTRY_ISO: Record<string, string> = {
   india: 'IN', 'united states': 'US', usa: 'US', us: 'US',

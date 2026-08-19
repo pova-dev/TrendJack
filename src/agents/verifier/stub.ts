@@ -11,8 +11,9 @@ import type { VerifierAdapter } from './types';
 export const stubVerifier: VerifierAdapter = {
   async verify({ signal }) {
     // The "claim": the trend's own title, sourced from its own URL.
-    // Confidence is high (1.0) because we're not making anything up —
-    // we're just echoing what the source said.
+    // Confidence is deliberately MODEST (0.4) — we're just echoing the
+    // headline, not verifying any structured fact. Audit 2026-05-29 D9
+    // flagged the previous 1.0 as misleading for downstream UI consumers.
     const claims = signal.url
       ? [
           {
@@ -21,7 +22,7 @@ export const stubVerifier: VerifierAdapter = {
             value: signal.title.slice(0, 200),
             sourceUrl: signal.url,
             quotedSpan: signal.summary.slice(0, 200) || signal.title.slice(0, 200),
-            confidence: 1.0,
+            confidence: 0.4,
           },
         ]
       : [];
@@ -33,7 +34,7 @@ export const stubVerifier: VerifierAdapter = {
         `claims (price, specs, dates, etc.) configure a premium AI provider.`,
       claims,
       unverifiedClaims: [],
-      provider: 'none',
+      provider: 'stub',
       model: 'stub',
       tier: 'balanced',
     };

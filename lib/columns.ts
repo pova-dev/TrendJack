@@ -33,9 +33,15 @@ import type { ColumnConfig, Trend, ColumnType, ColumnFilters } from '@/types';
 //               Full filtered view, no exclusion. They tap everything.
 const OBSERVER_TYPES = new Set<ColumnType>([
   'alerts', 'risk_watch', 'decay_watch', 'compliance_hold', 'crisis_watch',
+  // Audit 2026-05-29 — High Velocity Posts is a peripheral-awareness
+  // lane: "show me the fastest-moving signals regardless of which
+  // primary column owns them". Moving it from SECONDARY to OBSERVER lets
+  // it tap the full stream so it isn't starved by Pinned / Brand /
+  // Rising / Trending / Competitor lanes that all claim fast trends first.
+  'high_velocity',
 ]);
 const SECONDARY_TYPES = new Set<ColumnType>([
-  'rising_trends', 'high_velocity', 'first_mover_window',
+  'rising_trends', 'first_mover_window',
   'emerging_memes', 'creator_signals', 'localization_queue',
 ]);
 function isPrimary(col: { type: ColumnType; filters: ColumnFilters }): boolean {
@@ -235,9 +241,30 @@ export function applyColumnFilter(
     // `[cat:<id>]` prefix per fan-out fetch; we substring-match here so
     // legacy rows (no tag, ingested before fan-out shipped) still pass
     // unfiltered to avoid breaking existing columns.
+    //
+    // Audit 2026-05-29 — Indian trending titles (cricket, politics,
+    // weather) rarely contain explicit tech keywords, so the classifier
+    // returns 'top' for almost everything and the Sci & Tech column ends
+    // up empty. As a fallback, we also accept trends whose title matches
+    // the category's keyword set, even if the classifier tagged them
+    // 'top'. Keeps the column populated without false-categorizing the
+    // underlying signal.
     if (f.gtrendsCategory && t.source === 'google_trends') {
       const tag = `[cat:${f.gtrendsCategory}]`;
-      if (!t.lineage.startsWith(tag)) return false;
+      if (!t.lineage.startsWith(tag)) {
+        // Title-keyword salvage path. Only applies to 'm' (sci & tech)
+        // currently — the column most likely to be empty on India geo.
+        const titleLower = (t.title + ' ' + (t.summary ?? '')).toLowerCase();
+        const fallbacks: Record<string, RegExp> = {
+          m: /\b(iphone|samsung|android|chip|gpu|cpu|ai|chatgpt|gemini|llm|launch|release|app|pixel|macbook|leak|specs|review|nvidia|intel|amd|qualcomm|snapdragon|mediatek|oneplus|xiaomi|oppo|vivo|realme|tecno|infinix|nothing|cmf|smartphone|tablet|laptop|software|update|os|firmware|tesla|spacex|openai|deepmind|apple|google|microsoft|alphabet|amazon|tech|gadget|phone|mobile)\b/i,
+          t: /\b(vs|v\.|ipl|epl|laliga|fifa|odi|t20|cricket|football|hockey|tennis|f1|tournament|match|world cup|champions league|league|kings|royals|riders|chargers|titans|stars)\b/i,
+          b: /\b(stock|nasdaq|sensex|nifty|ipo|earnings|merger|acquisition|funding|inflation|interest rate|crypto|bitcoin|ethereum|rupee|dollar|market|invest)\b/i,
+          e: /\b(film|movie|trailer|teaser|box office|series|season|netflix|prime video|hotstar|spotify|grammy|oscar|bollywood|tollywood|actor|actress|song)\b/i,
+          h: /\b(vaccine|covid|outbreak|disease|symptom|diet|workout|cancer|diabetes|fitness|wellness|health)\b/i,
+        };
+        const rx = fallbacks[f.gtrendsCategory];
+        if (!rx || !rx.test(titleLower)) return false;
+      }
     }
     if (typeof f.windowHours === 'number') {
       const ageHours = (Date.now() - new Date(t.firstSeenAt).getTime()) / 3_600_000;
@@ -318,9 +345,18 @@ export function applyColumnFilter(
     }
 
     // ─── Decay auto-move ────────────────────────────────────────────────
-    // Trends past 70% of their estimated peak life are hidden from every
-    // column EXCEPT decay_watch (or columns that explicitly opted in via
-    // filters.decay). Keeps main columns fresh.
+    // Trends past 70% of their estimated peak life are hidden from
+    // SECONDARY catch-all columns (Rising Trends, High Velocity Posts,
+    // First-Mover Window) to keep them fresh.
+    //
+    // Audit 2026-05-29 (brand-matches empty bug): primary lanes
+    // (brand_matches, competitor_activity, anything with a sources/
+    // brandKeyword/competitorClaimed filter, Meta Ad Library, etc.) are
+    // operator-explicit lanes. The operator put them on the board to
+    // watch a specific stream. Hiding signals that happen to be past a
+    // velocity-derived peak (which collapses to ~now for zero-engagement
+    // signals like Meta Ads) silently empties those lanes. Decay no
+    // longer applies to PRIMARY columns by default.
     //
     // Pinned trends and the dedicated Pinned Watchlist column are exempt:
     // pinning means "I want to track this long-term", which is the whole
@@ -330,9 +366,17 @@ export function applyColumnFilter(
     // TrendSample rows yet). In that case we don't know the trend's
     // lifetime, so we MUST skip the decay filter — otherwise the ratio
     // math collapses to (elapsed_ms / 1) which is always >> 0.7 and the
-    // trend gets filtered out moments after emission. This was the
-    // root cause of the Meta Ad Library column showing empty (Round 5).
-    if (col.type !== 'decay_watch' && !f.decay && !f.pinnedOnly && !t.pinned && t.peakWindowEnd) {
+    // trend gets filtered out moments after emission.
+    const PRIMARY_TYPES_BYPASS_DECAY = new Set([
+      'brand_matches', 'competitor_activity', 'pinned_watchlist',
+      'google_trends', 'custom',
+    ]);
+    const isPrimaryByType = PRIMARY_TYPES_BYPASS_DECAY.has(col.type);
+    const isPrimaryByFilter =
+      f.brandKeywordOnly || f.competitorClaimed === true || f.pinnedOnly ||
+      (f.sources?.length ?? 0) > 0 || (f.keywordInclude?.length ?? 0) > 0;
+    const skipDecay = isPrimaryByType || isPrimaryByFilter;
+    if (col.type !== 'decay_watch' && !f.decay && !f.pinnedOnly && !t.pinned && !skipDecay && t.peakWindowEnd) {
       const peak = new Date(t.peakWindowEnd).getTime();
       const start = new Date(t.firstSeenAt).getTime();
       const ratio = (now - start) / Math.max(peak - start, 1);

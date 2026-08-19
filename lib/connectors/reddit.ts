@@ -1,22 +1,55 @@
-// Reddit live connector — uses the public JSON endpoints. No auth required
-// for public listing, but Reddit blocks default Node fetch UAs, so we set
-// a polite custom UA. To pass tighter rate limits, set REDDIT_USER_AGENT
-// (e.g. "trendjack/1.0 by u/yourname").
+// Reddit live connector.
+//
+// Two auth modes, picked automatically:
+//   1. OAuth (preferred) — when both REDDIT_CLIENT_ID and
+//      REDDIT_CLIENT_SECRET are set, exchange them for a Client
+//      Credentials Bearer token and hit `oauth.reddit.com` with the
+//      higher ~100 req/min rate envelope. Token caches in-process.
+//   2. Anonymous public JSON — falls back to `www.reddit.com/*.json`
+//      with a UA-only header. Throttled ~30 req/min; will 429 under
+//      cron load.
+//
+// Audit 2026-05-29 D7 — OAuth path was previously unimplemented; ingest
+// reliably 429'd in production. Now uses OAuth when configured.
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
-// Reddit's API now rate-limits aggressively on generic UAs.
-// The convention they actually want: `<bot-name>/<version> by /u/<username>`
-// or a real browser UA. Without this, requests 429 immediately.
-//
-// Operator override: set REDDIT_USER_AGENT (org credential or env) to a
-// real reddit-style UA with a username they own, e.g.
-//   "trendjack/1.0 by /u/yourname"
-// That + ~30 req/min cadence is the sweet spot for unauthenticated
-// Reddit. Above that, OAuth via REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET
-// is the next step (not implemented yet).
 const DEFAULT_UA = 'Mozilla/5.0 (compatible; TrendJackBot/1.0; +https://trendjack.app/about)';
+
+// In-process OAuth token cache. Survives between polls within the same Node
+// process; the worker / dev server reuses it across cron ticks.
+interface RedditToken { value: string; expiresAt: number }
+const TOKEN_CACHE = new Map<string, RedditToken>();
+
+async function getOauthToken(clientId: string, clientSecret: string, ua: string): Promise<string | null> {
+  const cacheKey = `${clientId}:${clientSecret}`;
+  const cached = TOKEN_CACHE.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 30_000) return cached.value;
+  try {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${basic}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        'user-agent': ua,
+      },
+      body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { access_token?: string; expires_in?: number };
+    if (!json.access_token) return null;
+    TOKEN_CACHE.set(cacheKey, {
+      value: json.access_token,
+      expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
+    });
+    return json.access_token;
+  } catch {
+    return null;
+  }
+}
 
 interface RedditPost {
   data: {
@@ -41,6 +74,8 @@ export class RedditLiveConnector implements Connector {
 
   async poll(opts: ConnectorPollOpts): Promise<ConnectorResult> {
     const ua = opts.credentials?.REDDIT_USER_AGENT || process.env.REDDIT_USER_AGENT || DEFAULT_UA;
+    const clientId = opts.credentials?.REDDIT_CLIENT_ID || process.env.REDDIT_CLIENT_ID;
+    const clientSecret = opts.credentials?.REDDIT_CLIENT_SECRET || process.env.REDDIT_CLIENT_SECRET;
     const since = opts.since?.getTime() ?? Date.now() - 24 * 60 * 60 * 1000;
     const competitorSet = new Set((opts.competitors ?? []).map(c => c.toLowerCase()));
     const brandKw = (opts.brandKeywords ?? []).map(k => k.toLowerCase()).filter(Boolean);
@@ -49,7 +84,18 @@ export class RedditLiveConnector implements Connector {
 
     const signals: RawSignal[] = [];
     const seen = new Set<string>(); // dedupe by post id across both passes
-    const headers = { 'user-agent': ua, accept: 'application/json' };
+
+    // Audit 2026-05-29 D7 — try OAuth first. If we get a token, switch
+    // base URL to oauth.reddit.com (higher rate envelope).
+    let baseUrl = 'https://www.reddit.com';
+    const headers: Record<string, string> = { 'user-agent': ua, accept: 'application/json' };
+    if (clientId && clientSecret) {
+      const token = await getOauthToken(clientId, clientSecret, ua);
+      if (token) {
+        baseUrl = 'https://oauth.reddit.com';
+        headers.authorization = `Bearer ${token}`;
+      }
+    }
 
     // PASS 1 — reddit-wide /search.json fan-out by brand keywords +
     // competitors + a couple themes. This is the primary signal: search
@@ -75,7 +121,7 @@ export class RedditLiveConnector implements Connector {
     };
 
     for (const q of searchTerms) {
-      const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&t=day&limit=15&raw_json=1`;
+      const url = `${baseUrl}/search.json?q=${encodeURIComponent(q)}&sort=new&t=day&limit=15&raw_json=1`;
       const res = await fetchWithTimeout(url);
       if (!res || !res.ok) { await sleep(200); continue; }
       try {
@@ -92,7 +138,7 @@ export class RedditLiveConnector implements Connector {
     // Capped to 4 subs to stay under Reddit's rate envelope.
     const filterKw = Array.from(new Set([...brandKw, ...themes.map(t => t.toLowerCase())]));
     for (const sub of this.subs.slice(0, 4)) {
-      const url = `https://www.reddit.com/r/${encodeURIComponent(sub)}/hot.json?limit=15&raw_json=1`;
+      const url = `${baseUrl}/r/${encodeURIComponent(sub)}/hot.json?limit=15&raw_json=1`;
       const res = await fetchWithTimeout(url);
       if (!res || !res.ok) { await sleep(200); continue; }
       try {

@@ -5,7 +5,7 @@
 // Env: INVIDIOUS_INSTANCES="https://yewtu.be,https://invidious.fdn.fr"
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 // Public Invidious has been collapsing since YouTube's mid-2024 anti-bot
 // rollout — most instances either rate-limit hard, require auth, or 403.

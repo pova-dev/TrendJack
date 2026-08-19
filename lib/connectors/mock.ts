@@ -1,6 +1,6 @@
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
 import type { SourceId } from '@/types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 // -----------------------------------------------------------------------------
 // Realistic POVA-context fixtures.

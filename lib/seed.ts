@@ -3,7 +3,7 @@
 
 import { prisma } from './db';
 import { getAllMockSignals } from '@/lib/connectors/mock';
-import { score } from '@/lib/scoring/engine';
+import { score } from '@/src/core/scoring';
 import { getBrand } from './store';
 import { pickSeedForBrand } from './seed-corpora';
 

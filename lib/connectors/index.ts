@@ -43,7 +43,10 @@ function optionsFor(source: SourceId): ConnectorOption[] {
   switch (source) {
     case 'x': return [
       { label: 'X / Twitter (official v2)',  conn: new XOfficialConnector(),  badge: 'official', requires: ['X_BEARER_TOKEN'] },
-      { label: 'Nitter (open source)',        conn: new NitterConnector(),     badge: 'oss' },
+      // Audit 2026-05-29 D6 — surface mirror fragility honestly. Most
+      // public Nitter instances have been blocked by X or shut down;
+      // operators almost always need to self-host or override NITTER_INSTANCES.
+      { label: 'Nitter — public mirrors (fragile)', conn: new NitterConnector(), badge: 'oss' },
       { label: 'Mock',                        conn: new MockConnector('mock_x', 'x'), badge: 'mock' },
     ];
     case 'reddit': return [
@@ -52,7 +55,10 @@ function optionsFor(source: SourceId): ConnectorOption[] {
     ];
     case 'youtube': return [
       { label: 'YouTube Data API v3',         conn: new YoutubeOfficialConnector(), badge: 'official', requires: ['YOUTUBE_API_KEY'] },
-      { label: 'Invidious (open source)',     conn: new InvidiousConnector(),       badge: 'oss' },
+      // Audit 2026-05-29 D6 — most public Invidious instances are
+      // throttled or behind Cloudflare challenges. Override INVIDIOUS_INSTANCES
+      // with self-hosted endpoints for reliable polling.
+      { label: 'Invidious — public mirrors (fragile)', conn: new InvidiousConnector(), badge: 'oss' },
       { label: 'Mock',                        conn: new MockConnector('mock_youtube', 'youtube'), badge: 'mock' },
     ];
     case 'tiktok': return [
@@ -60,19 +66,18 @@ function optionsFor(source: SourceId): ConnectorOption[] {
       { label: 'Mock',                        conn: new MockConnector('mock_tiktok', 'tiktok'), badge: 'mock' },
     ];
     case 'instagram': return [
-      // Meta locked down public Instagram data after the Graph API
-      // restrictions and CrowdTangle shutdown. There's no free official
-      // route — every working option needs configuration. We never silently
-      // mock for Meta sources.
-      { label: 'Apify Instagram Scraper (paid)', conn: new MockConnector('apify_ig_stub', 'instagram'),    badge: 'official', requires: ['APIFY_TOKEN'], configRequired: true },
-      { label: 'Instagram Graph API (own accounts only)', conn: new MockConnector('ig_graph_stub', 'instagram'), badge: 'official', requires: ['INSTAGRAM_ACCESS_TOKEN'], configRequired: true },
+      // Audit 2026-05-29 D1 — the previous code badged these as 'official'
+      // but they were MockConnector instances. A non-POVA tenant who set
+      // APIFY_TOKEN / INSTAGRAM_ACCESS_TOKEN would silently receive POVA-
+      // flavored fake trends. Demoted to 'mock' until real adapters land.
+      { label: 'Apify Instagram Scraper — stub (paid)', conn: new MockConnector('apify_ig_stub', 'instagram'),    badge: 'mock', requires: ['APIFY_TOKEN'], configRequired: true },
+      { label: 'Instagram Graph API — stub (own accounts only)', conn: new MockConnector('ig_graph_stub', 'instagram'), badge: 'mock', requires: ['INSTAGRAM_ACCESS_TOKEN'], configRequired: true },
       { label: 'RSSHub Instagram (fragile)',     conn: new RsshubConnector(), badge: 'oss', requires: ['RSSHUB_BASE', 'RSSHUB_FEEDS'], configRequired: true },
     ];
     case 'facebook': return [
-      // Same story as Instagram — CrowdTangle is dead, Graph API is owned-
-      // page-only. Either pay for a scraper or scrape via RSSHub.
-      { label: 'Apify Facebook Scraper (paid)',  conn: new MockConnector('apify_fb_stub', 'facebook'),    badge: 'official', requires: ['APIFY_TOKEN'], configRequired: true },
-      { label: 'Facebook Graph API (own pages only)', conn: new MockConnector('fb_graph_stub', 'facebook'), badge: 'official', requires: ['FACEBOOK_ACCESS_TOKEN'], configRequired: true },
+      // Audit 2026-05-29 D1 — same story as Instagram. Demoted to 'mock'.
+      { label: 'Apify Facebook Scraper — stub (paid)',  conn: new MockConnector('apify_fb_stub', 'facebook'),    badge: 'mock', requires: ['APIFY_TOKEN'], configRequired: true },
+      { label: 'Facebook Graph API — stub (own pages only)', conn: new MockConnector('fb_graph_stub', 'facebook'), badge: 'mock', requires: ['FACEBOOK_ACCESS_TOKEN'], configRequired: true },
       { label: 'RSSHub Facebook page (fragile)', conn: new RsshubConnector(), badge: 'oss', requires: ['RSSHUB_BASE', 'RSSHUB_FEEDS'], configRequired: true },
     ];
     case 'google_trends': return [
@@ -124,11 +129,17 @@ function pickActive(source: SourceId): { option: ConnectorOption | null; reason:
 // RSSHub when the user hasn't set RSSHUB_BASE). For those, getConnector
 // returns null and callers (ingest, /api/connectors/test) skip them with a
 // helpful "configure to enable" message instead of silently mocking.
+// Audit 2026-05-29 B4 — REGISTRY now includes instagram + facebook so
+// `getConnector('instagram')` / `getConnector('facebook')` returns either a
+// configured mock or null (the configRequired flag prevents silent mock
+// fallback for Meta sources).
 const REGISTRY: Partial<Record<SourceId, Connector>> = {
   x:             pickActive('x').option?.conn,
   reddit:        pickActive('reddit').option?.conn,
   youtube:       pickActive('youtube').option?.conn,
   tiktok:        pickActive('tiktok').option?.conn,
+  instagram:     pickActive('instagram').option?.conn,
+  facebook:      pickActive('facebook').option?.conn,
   google_trends: pickActive('google_trends').option?.conn,
   news:          pickActive('news').option?.conn,
   custom:        pickActive('custom').option?.conn,

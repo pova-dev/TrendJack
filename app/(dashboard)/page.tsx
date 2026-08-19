@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { listTrends, getDefaultBoard, getBrand, listBrandsForOrg } from '@/lib/store';
-import { listConnectors } from '@/lib/connectors';
+import { listConnectors, listConnectorOverview } from '@/lib/connectors';
 import { Board } from '@/components/board/Board';
 import { TopBar } from '@/components/shell/TopBar';
 import { ConnectorStatusBar } from '@/components/shell/ConnectorStatusBar';
@@ -11,6 +11,7 @@ import { GuidedTour } from '@/components/shell/GuidedTour';
 import { PendingPlansToast } from '@/components/shell/PendingPlansToast';
 import { getOrgCredentials } from '@/lib/credentials';
 import { aiHealth } from '@/lib/ai/provider';
+import { getCronStatus } from '@/lib/cron';
 
 export default async function DashboardPage() {
   const ctx = await requireBrand();
@@ -28,35 +29,53 @@ export default async function DashboardPage() {
 
   const postNowCount = trends.filter(t => t.recommendation === 'POST_NOW').length;
 
-  // Canonical-source connectors (X / Reddit / YouTube / TikTok / News /
-  // GTrends) come from listConnectors(). Auxiliary connectors registered
-  // separately in src/connectors/index.ts (Meta Ad Library, X-Trending24)
-  // get their own pills so the operator can see at a glance whether
-  // those niche surfaces are healthy.
-  const connectorStatuses = [
-    ...listConnectors().map(c => ({
+  // Audit 2026-05-29 U3 — was hardcoding `ok: true, lastRunAt: now` for
+  // every connector regardless of actual state. Now derives status from:
+  //   - registry (configured vs. unconfigured)
+  //   - getCronStatus() for the last successful ingest tick
+  //   - cron lastResult.bySource — if a source returned 0 signals AND has
+  //     errors in lastResult, mark it not-ok.
+  const cronStatus = getCronStatus();
+  const cronLastRunAt = cronStatus.lastRunAt ?? undefined;
+  const cronErrors = cronStatus.lastResult?.errors ?? [];
+  const overview = listConnectorOverview();
+  const overviewBySource = new Map(overview.map(o => [o.source, o] as const));
+
+  const canonicalStatuses = listConnectors().map(c => {
+    const ov = overviewBySource.get(c.source);
+    const configured = ov && !('unconfigured' in ov.active && ov.active.unconfigured);
+    const errored = cronErrors.some(e => e.toLowerCase().includes(c.source));
+    return {
       source: c.source,
       mode: c.mode,
-      ok: true,
-      lastRunAt: new Date().toISOString(),
-    })),
+      ok: !!configured && !errored,
+      lastRunAt: cronLastRunAt,
+    };
+  });
+
+  // Auxiliary connectors (Meta Ad Library, X-Trending24) — flagged as
+  // unknown when we have no cron stats yet, since the canonical cron
+  // doesn't yet track them by id.
+  const auxStatuses = [
     {
       id: 'x_trending',
       source: 'x' as const,
       label: 'X Trending',
       mode: 'live' as const,
-      ok: true,
-      lastRunAt: new Date().toISOString(),
+      ok: !!cronLastRunAt,
+      lastRunAt: cronLastRunAt,
     },
     {
       id: 'meta_ads_lib',
       source: 'custom' as const,
       label: 'Meta Ads',
       mode: 'live' as const,
-      ok: true,
-      lastRunAt: new Date().toISOString(),
+      ok: !!cronLastRunAt,
+      lastRunAt: cronLastRunAt,
     },
   ];
+
+  const connectorStatuses = [...canonicalStatuses, ...auxStatuses];
 
   return (
     <>

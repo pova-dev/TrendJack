@@ -5,7 +5,7 @@
 // delta vs prior poll so the UI can render a ▲/▼ chip.
 
 import { prisma } from './db';
-import { score, type RawSignal } from '@/lib/scoring/engine';
+import { score, type RawSignal } from '@/src/core/scoring';
 import { getBrand } from './store';
 import { getOrgCredentials } from './credentials';
 import { primaryGeoForBrand } from './countries';
