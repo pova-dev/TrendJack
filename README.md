@@ -35,12 +35,24 @@ routing to Slack / Telegram / Sheets / Notion / webhooks.
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/<your-org>/trendjack
-cd trendjack
+git clone https://github.com/pova-dev/TrendJack.git
+cd TrendJack
 cp .env.example .env.local                 # set SESSION_SECRET (32+ chars)
 npm install
 DATABASE_URL="file:./dev.db" npx prisma db push
-npm run dev                                 # → http://localhost:3000
+npm run dev                                 # http://localhost:3000
+```
+
+Then open `/dev/login` for a seeded demo account, or `/signup` to create your own.
+
+**On macOS, if the app fails to start.** If you moved this folder through
+AirDrop, Feishu, Slack or a zip, macOS flags every downloaded file and then
+refuses to load native binaries, so Next falls back to a slow WASM compiler
+and Prisma cannot open the database at all. The error reads `library load
+disallowed by system policy`. One command clears it:
+
+```bash
+xattr -dr com.apple.quarantine node_modules
 ```
 
 Three ways in:
