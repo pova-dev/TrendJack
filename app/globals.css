@@ -38,6 +38,11 @@
   --scrollbar-thumb: rgb(var(--ink-700));
   --scrollbar-thumb-hover: rgb(var(--ink-600));
   --kbd-border: rgba(255, 255, 255, 0.08);
+
+  /* Social sparklines. Same hues as signal.green / signal.red so a rising
+     follower line reads as "good" consistently with every other chip. */
+  --sparkline-up:   #22C55E;
+  --sparkline-down: #EF4444;
 }
 
 html.light {
@@ -62,6 +67,11 @@ html.light {
   --scrollbar-thumb: rgb(var(--ink-600));
   --scrollbar-thumb-hover: rgb(var(--ink-500));
   --kbd-border: rgba(0, 0, 0, 0.12);
+
+  /* Darker stops — the light theme's paper needs more contrast than the
+     war-room chrome to keep a 1.5px line legible. */
+  --sparkline-up:   #15803D;
+  --sparkline-down: #B91C1C;
 }
 
 html, body {
