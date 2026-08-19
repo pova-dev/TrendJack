@@ -104,3 +104,13 @@ export const IconLogout = (p: React.SVGProps<SVGSVGElement>) => (
     <path d="M21 12H9" />
   </svg>
 );
+
+// Social analytics — a rising trend line inside a frame, matching the
+// outline language of the other rail icons rather than any platform logo.
+export const IconSocial = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <path d="m7 15 3.2-3.4 2.4 2.2L17 9" />
+    <path d="M17 9h-2.6M17 9v2.6" />
+  </svg>
+);

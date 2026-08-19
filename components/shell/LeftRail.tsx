@@ -7,14 +7,15 @@ import { signoutAction } from '@/lib/auth/actions';
 import {
   IconBoards, IconQueue, IconBrand, IconConnectors,
   IconScoring, IconAlerts, IconIntegrations, IconAudit,
-  IconSparkle, IconSettings, IconLogout,
+  IconSparkle, IconSettings, IconLogout, IconSocial,
 } from './icons';
 
-// Primary nav — only the "live work" pages: dashboard + draft queue.
-// Everything configurable lives behind Settings.
+// Primary nav — only the "live work" pages: dashboard, draft queue, and the
+// social channel monitor. Everything configurable lives behind Settings.
 const ITEMS = [
   { href: '/',         label: 'Boards',      Icon: IconBoards },
   { href: '/queue',    label: 'Draft queue', Icon: IconQueue },
+  { href: '/social',   label: 'Social',      Icon: IconSocial },
 ];
 
 // Secondary nav — single Settings entry that opens the unified hub
