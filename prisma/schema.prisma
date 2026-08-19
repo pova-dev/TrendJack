@@ -16,22 +16,22 @@ datasource db {
 // -----------------------------------------------------------------------------
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
+  id            String       @id @default(cuid())
+  email         String       @unique
   name          String?
   passwordHash  String
   emailVerified DateTime?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime     @default(now())
   memberships   Membership[]
   auditLogs     AuditLog[]
 }
 
 model Organization {
-  id          String       @id @default(cuid())
+  id          String               @id @default(cuid())
   name        String
-  slug        String       @unique
-  plan        String       @default("free") // free | pro | enterprise
-  createdAt   DateTime     @default(now())
+  slug        String               @unique
+  plan        String               @default("free") // free | pro | enterprise
+  createdAt   DateTime             @default(now())
   memberships Membership[]
   brands      Brand[]
   invites     Invite[]
@@ -70,19 +70,19 @@ model Invite {
 // -----------------------------------------------------------------------------
 
 model Brand {
-  id                String        @id @default(cuid())
+  id                String       @id @default(cuid())
   orgId             String
-  org               Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name              String
-  category          String        @default("")
-  markets           String        @default("[]")
-  audience          String        @default("{}")
-  tone              String        @default("{}")
-  bannedTopics      String        @default("[]")
+  category          String       @default("")
+  markets           String       @default("[]")
+  audience          String       @default("{}")
+  tone              String       @default("{}")
+  bannedTopics      String       @default("[]")
   /// JSON array of brand-specific keywords + product names. Hits on these
   /// keywords are what land a trend in the "Brand Matches" column.
   /// e.g. for POVA: ["pova","tecno pova","pova curve","pova 7","tecno"]
-  brandKeywords     String        @default("[]")
+  brandKeywords     String       @default("[]")
   /// JSON array of Google Trends category ids to ingest for this brand.
   /// The Google Trends connector fans out one fetch per category and tags
   /// each signal in the lineage. Empty array = "top stories" (all
@@ -91,11 +91,11 @@ model Brand {
   ///   't' → sports               'e' → entertainment
   ///   'm' → sci/tech             'h' → health
   /// Auto-suggested at brand creation from `category` text.
-  gtrendsCategories String        @default("[]")
+  gtrendsCategories String       @default("[]")
   /// Optional sub-locality slug (e.g. 'mumbai', 'new-york') for
   /// connectors that support city-level drilldown (X Trending via
   /// trends24.in). Empty = country-level only. Lowercase-dashed.
-  geoSubregion      String        @default("")
+  geoSubregion      String       @default("")
   /// JSON map of competitorName → Facebook Page ID for Meta Ad Library
   /// deep-linking. With the page ID, the connector hits Meta's
   /// `view_all_page_id=<id>` URL which targets the exact page's active
@@ -104,17 +104,17 @@ model Brand {
   /// Example: {"Samsung":"11648534","Xiaomi":"100..."}
   /// Empty / missing competitors fall back to keyword search with a
   /// "search-fallback" tag in the lineage.
-  competitorPageIds String        @default("{}")
-  safeThemes        String        @default("[]")
-  competitors       String        @default("[]")
-  priorityPlatforms String        @default("[]")
-  contentGoal       String        @default("")
-  riskTolerance     String        @default("medium")
-  approvalMode      String        @default("moderate")
-  crisisMode        Boolean       @default(false)
-  scoringWeights    String        @default("{}")
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  competitorPageIds String       @default("{}")
+  safeThemes        String       @default("[]")
+  competitors       String       @default("[]")
+  priorityPlatforms String       @default("[]")
+  contentGoal       String       @default("")
+  riskTolerance     String       @default("medium")
+  approvalMode      String       @default("moderate")
+  crisisMode        Boolean      @default(false)
+  scoringWeights    String       @default("{}")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   trends         Trend[]
   drafts         Draft[]
@@ -122,6 +122,7 @@ model Brand {
   alertRules     AlertRule[]
   connectors     Connector[]
   approvalRules  ApprovalRule[]
+  socialAccounts SocialAccount[]
 
   @@index([orgId])
 }
@@ -131,67 +132,67 @@ model Brand {
 // -----------------------------------------------------------------------------
 
 model Trend {
-  id                   String   @id @default(cuid())
-  brandId              String
-  brand                Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  source               String
-  sourceRef            String
-  title                String
-  summary              String
-  hashtags             String
-  lineage              String
-  catalyst             String?
-  firstSeenAt          DateTime
-  peakAt               DateTime?
-  peakWindowEnd        DateTime?
-  velocity             Float
-  reach                BigInt
-  sentiment            Float
-  audienceOverlap      Float
-  scores               String
-  rationale            String
-  recommendation       String
-  recommendationReason String
-  competitorClaimed    Boolean  @default(false)
-  competitorClaimants  String   @default("[]")
+  id                      String        @id @default(cuid())
+  brandId                 String
+  brand                   Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  source                  String
+  sourceRef               String
+  title                   String
+  summary                 String
+  hashtags                String
+  lineage                 String
+  catalyst                String?
+  firstSeenAt             DateTime
+  peakAt                  DateTime?
+  peakWindowEnd           DateTime?
+  velocity                Float
+  reach                   BigInt
+  sentiment               Float
+  audienceOverlap         Float
+  scores                  String
+  rationale               String
+  recommendation          String
+  recommendationReason    String
+  competitorClaimed       Boolean       @default(false)
+  competitorClaimants     String        @default("[]")
   /// Predictive Virality (Phase 1) — populated by forecastPeak()
   /// against the trend's TrendSample series. Nullable so trends with
   /// <3 samples render as `—` rather than throwing.
-  predictedPeakAt          DateTime?
-  predictedPeakConfidence  Float?
-  cascadePhase             String?   // 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying'
+  predictedPeakAt         DateTime?
+  predictedPeakConfidence Float?
+  cascadePhase            String? // 'pre-launch' | 'fast-growing-initial' | 'peaking' | 'decaying'
   /// Calibration multiplier applied to opportunity at score time (Feature D).
   /// 1.0 = no nudge (cold start); >1 = boosted; <1 = dragged. UI renders
   /// a ↑/↓ glyph next to the recommendation badge when |boost-1| > 0.05.
-  calibrationBoost         Float?
+  calibrationBoost        Float?
   /// True iff one of brand.brandKeywords was found in title/summary/text.
   /// Powers the Brand Matches column filter (independent of brandFit
   /// composite score). A "POVA Curve 2 review" article hits this; an
   /// "OnePlus Buds Ace 3" article does NOT.
-  brandKeywordHit      Boolean  @default(false)
+  brandKeywordHit         Boolean       @default(false)
   /// JSON array of which brand keywords matched (for the rationale UI).
-  matchedBrandKeywords String   @default("[]")
-  formatFatigue        Float
-  examples             String?
-  rawPayload           String?
-  url                  String?
-  pinned               Boolean  @default(false)
-  velocityPrev         Float?
-  velocityDelta        Float?
-  researchCache        String?  // JSON of last research result
-  lineageCache         String?  // JSON of last deep-lineage probe
+  matchedBrandKeywords    String        @default("[]")
+  formatFatigue           Float
+  examples                String?
+  rawPayload              String?
+  url                     String?
+  pinned                  Boolean       @default(false)
+  velocityPrev            Float?
+  velocityDelta           Float?
+  researchCache           String? // JSON of last research result
+  lineageCache            String? // JSON of last deep-lineage probe
   // Performance feedback (populated post-ship)
-  shippedAt            DateTime?
-  postUrl              String?
-  postImpressions      BigInt?
-  postEngagement       BigInt?
-  performanceMultiple  Float?
-  drafts               Draft[]
-  actions              TrendAction[]
-  samples              TrendSample[]
-  battleCards          BattleCard[]
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  shippedAt               DateTime?
+  postUrl                 String?
+  postImpressions         BigInt?
+  postEngagement          BigInt?
+  performanceMultiple     Float?
+  drafts                  Draft[]
+  actions                 TrendAction[]
+  samples                 TrendSample[]
+  battleCards             BattleCard[]
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   @@index([brandId, recommendation])
   @@index([brandId, firstSeenAt])
@@ -268,41 +269,50 @@ model Board {
 // Alerts, Approvals, Connectors, Webhooks
 // -----------------------------------------------------------------------------
 
+// AlertRule — DEPRECATED 2026-05-29. Never had reads or writes anywhere in
+// the app. Hardcoded SAMPLE_RULES on the /alerts page substitutes for it.
+// Keep the table until a follow-up migration drops it cleanly; new code MUST
+// NOT add references.
 model AlertRule {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   brandId   String
-  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand     Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
   name      String
   condition String
   threshold String
   channel   String
-  active    Boolean  @default(true)
+  active    Boolean @default(true)
 }
 
+// ApprovalRule — DEPRECATED 2026-05-29. No queries; superseded by the
+// Brand.approvalMode flag plus per-trend manual review.
 model ApprovalRule {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   brandId   String
-  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand     Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
   // e.g. "risk > 0.5 OR variant = 'bold'"
   condition String
   // routing target: slack channel, user email, or external URL
-  routeType String   // slack | email | webhook
+  routeType String // slack | email | webhook
   routeTo   String
-  priority  Int      @default(2) // 0..3, lower is higher priority
-  active    Boolean  @default(true)
+  priority  Int     @default(2) // 0..3, lower is higher priority
+  active    Boolean @default(true)
 }
 
+// Connector — DEPRECATED 2026-05-29. Superseded by the org-level Credential
+// model + the in-memory pickActive() registry in lib/connectors/index.ts.
+// Drop in the next schema migration; no app code touches this table.
 model Connector {
-  id        String       @id @default(cuid())
+  id        String    @id @default(cuid())
   brandId   String
-  brand     Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand     Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
   source    String
   mode      String
   authBlob  String?
-  config    String       @default("{}")
+  config    String    @default("{}")
   lastRunAt DateTime?
   lastError String?
-  active    Boolean      @default(true)
+  active    Boolean   @default(true)
 }
 
 model TelegramConnection {
@@ -315,6 +325,7 @@ model TelegramConnection {
   events        String       @default("[]") // JSON array of subscribed events
   active        Boolean      @default(true)
   createdAt     DateTime     @default(now())
+
   @@index([orgId])
 }
 
@@ -324,7 +335,7 @@ model Webhook {
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name      String
   url       String
-  events    String       // JSON array of events to fire on, e.g. ["trend.post_now","draft.shipped"]
+  events    String // JSON array of events to fire on, e.g. ["trend.post_now","draft.shipped"]
   secret    String?
   active    Boolean      @default(true)
   createdAt DateTime     @default(now())
@@ -343,7 +354,7 @@ model Credential {
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   scope     String
   key       String
-  value     String       // AES-GCM ciphertext, base64-encoded
+  value     String // AES-GCM ciphertext, base64-encoded
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -357,9 +368,9 @@ model AuditLog {
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   userId    String?
   user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action    String       // brand.update, trend.dismiss, draft.approve, …
-  target    String?      // entity id this action affected
-  meta      String?      // JSON
+  action    String // brand.update, trend.dismiss, draft.approve, …
+  target    String? // entity id this action affected
+  meta      String? // JSON
   createdAt DateTime     @default(now())
 
   @@index([orgId, createdAt])
@@ -377,24 +388,25 @@ model AuditLog {
 /// proposed schedule, draft variant id. Persisted as JSON for
 /// flexibility across plan versions.
 model ShipItPlan {
-  id              String   @id @default(cuid())
-  trendId         String
-  brandId         String
-  orgId           String
-  status          String   @default("draft") // draft | pending_approval | approved | rejected | shipped | expired | superseded
-  chosenAngleRef  String   // "<battleCardId>:<angleIndex>" or "draft:<draftId>"
-  draftVariantId  String?
-  payload         String   // JSON ShipItPlan
+  id                 String    @id @default(cuid())
+  trendId            String
+  brandId            String
+  orgId              String
+  status             String    @default("draft") // draft | pending_approval | approved | rejected | shipped | expired | superseded
+  chosenAngleRef     String // "<battleCardId>:<angleIndex>" or "draft:<draftId>"
+  draftVariantId     String?
+  payload            String // JSON ShipItPlan
   proposedScheduleAt DateTime
-  expiresAt       DateTime
-  promptVersion   String   @default("v1")
-  cost            Float    @default(0)
-  createdAt       DateTime @default(now())
-  decidedAt       DateTime?
-  decidedBy       String?
-  decisionReason  String?
-  shippedAt       DateTime?
-  postUrl         String?
+  expiresAt          DateTime
+  promptVersion      String    @default("v1")
+  cost               Float     @default(0)
+  createdAt          DateTime  @default(now())
+  decidedAt          DateTime?
+  decidedBy          String?
+  decisionReason     String?
+  shippedAt          DateTime?
+  postUrl            String?
+
   @@index([brandId, status])
   @@index([trendId, createdAt])
 }
@@ -408,47 +420,50 @@ model ShipItPlan {
 /// STREAMS.alerts AND STREAMS.operatorFeedback so collective decisions
 /// feed Feature D's calibration loop.
 model TrendRoom {
-  id             String   @id @default(cuid())
-  trendId        String   @unique
+  id             String        @id @default(cuid())
+  trendId        String        @unique
   brandId        String
   orgId          String
-  status         String   @default("open")  // open | decided | archived
-  decidedAngle   String?  // angleId from BattleCard or Draft variant id
+  status         String        @default("open") // open | decided | archived
+  decidedAngle   String? // angleId from BattleCard or Draft variant id
   decisionReason String?
-  decidedBy      String?  // userId
+  decidedBy      String? // userId
   decidedAt      DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime      @default(now())
   comments       RoomComment[]
   votes          RoomVote[]
+
   @@index([brandId, status])
   @@index([orgId, createdAt])
 }
 
 model RoomComment {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   roomId     String
   room       TrendRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   userId     String
-  parentId   String?  // threaded replies
+  parentId   String? // threaded replies
   /// What evidence are we commenting on?
   /// 'battle-card.angle' | 'lineage.sibling' | 'citation' |
   /// 'forecast' | 'draft.variant' | 'general'
-  anchorType String   @default("general")
-  anchorRef  String?  // id of the anchored entity
+  anchorType String    @default("general")
+  anchorRef  String? // id of the anchored entity
   body       String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
+
   @@index([roomId, createdAt])
 }
 
 model RoomVote {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   roomId    String
   room      TrendRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   userId    String
   /// id from BattleCard.payload.angleOptions or Draft.id
   angleId   String
-  weight    Int      @default(1)  // role-weighted
-  createdAt DateTime @default(now())
+  weight    Int       @default(1) // role-weighted
+  createdAt DateTime  @default(now())
+
   @@unique([roomId, userId, angleId])
   @@index([roomId])
 }
@@ -466,15 +481,16 @@ model RoomVote {
 /// calibration agent reads this on cold-boot to backfill buckets when
 /// the in-memory estimator is freshly initialized.
 model FeedbackEvent {
-  id          String   @id @default(cuid())
-  trendId     String
-  brandId     String
-  userId      String
-  action      String   // ActionType union member
-  polarity    Int      // -1 | 0 | 1
-  features    String   // JSON snapshot
-  reason      String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  trendId   String
+  brandId   String
+  userId    String
+  action    String // ActionType union member
+  polarity  Int // -1 | 0 | 1
+  features  String // JSON snapshot
+  reason    String?
+  createdAt DateTime @default(now())
+
   @@index([brandId, createdAt])
   @@index([trendId, createdAt])
 }
@@ -497,6 +513,7 @@ model OperatorFeedbackBucket {
   positiveCount Int      @default(0)
   negativeCount Int      @default(0)
   updatedAt     DateTime @updatedAt
+
   @@unique([brandId, axis, bucket])
   @@index([brandId])
 }
@@ -514,21 +531,21 @@ model OperatorFeedbackBucket {
 /// JSON array of competitor names also surfaced — lets us compute
 /// model-share-of-voice over time.
 model BrandCitationSample {
-  id                    String   @id @default(cuid())
-  brandId               String
-  orgId                 String
-  model                 String
-  promptClass           String   // 'recommendation' | 'comparison' | 'what-is' | 'top-list'
-  promptVersion         String   @default("v1")
-  promptText            String
-  cited                 Boolean
-  position              Int?
-  snippet               String?
-  competitorsMentioned  String   @default("[]")  // JSON array
-  cost                  Float    @default(0)
-  runFailed             Boolean  @default(false)
-  failureReason         String?
-  runAt                 DateTime @default(now())
+  id                   String   @id @default(cuid())
+  brandId              String
+  orgId                String
+  model                String
+  promptClass          String // 'recommendation' | 'comparison' | 'what-is' | 'top-list'
+  promptVersion        String   @default("v1")
+  promptText           String
+  cited                Boolean
+  position             Int?
+  snippet              String?
+  competitorsMentioned String   @default("[]") // JSON array
+  cost                 Float    @default(0)
+  runFailed            Boolean  @default(false)
+  failureReason        String?
+  runAt                DateTime @default(now())
 
   @@index([brandId, runAt])
   @@index([brandId, model, runAt])
@@ -548,18 +565,18 @@ model BrandCitationSample {
 /// src/agents/battlecard/schema.ts (verdict, angleOptions[],
 /// counterClaim, doNotDo[], etc.)
 model BattleCard {
-  id             String   @id @default(cuid())
-  trendId        String
-  trend          Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
-  brandId        String
-  orgId          String
-  verdict        String   // 'counter' | 'ignore' | 'out-flank' | 'monitor'
-  verdictReason  String   @default("")
-  payload        String   // JSON BattleCard
-  cost           Float    @default(0)
-  generatedAt    DateTime @default(now())
-  supersededAt   DateTime?
-  promptVersion  String   @default("v1")
+  id            String    @id @default(cuid())
+  trendId       String
+  trend         Trend     @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  brandId       String
+  orgId         String
+  verdict       String // 'counter' | 'ignore' | 'out-flank' | 'monitor'
+  verdictReason String    @default("")
+  payload       String // JSON BattleCard
+  cost          Float     @default(0)
+  generatedAt   DateTime  @default(now())
+  supersededAt  DateTime?
+  promptVersion String    @default("v1")
 
   @@index([trendId, supersededAt])
   @@index([brandId, generatedAt])
@@ -580,18 +597,138 @@ model BattleCard {
 /// Stale subscriptions (404 / 410 from the push service) get pruned by
 /// the delivery worker.
 model PushSubscription {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   brandId    String
   userId     String
-  endpoint   String   @unique
-  p256dh     String   // public key from PushSubscription.keys.p256dh
-  auth       String   // auth secret from PushSubscription.keys.auth
-  userAgent  String?  // captured from the request to help operators identify devices
+  endpoint   String    @unique
+  p256dh     String // public key from PushSubscription.keys.p256dh
+  auth       String // auth secret from PushSubscription.keys.auth
+  userAgent  String? // captured from the request to help operators identify devices
   expiresAt  DateTime?
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-  failCount  Int      @default(0)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  failCount  Int       @default(0)
 
   @@index([brandId])
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Social Channel Analytics
+//
+// Tracks POVA's own accounts AND competitor accounts across Instagram /
+// Facebook / YouTube, so the Social tab can show live counters, last-post
+// performance, and (on demand) the actual comments.
+//
+// Two data paths, chosen per account by `isOwn`:
+//   isOwn = true   → official APIs. Meta Graph API for IG/FB, YouTube Data
+//                    API v3 for YouTube. Free, exact, and they expose metrics
+//                    (reach, impressions) that no scraper can see.
+//   isOwn = false  → Apify actors. The only way to read a competitor's
+//                    public numbers. Costs per result, so cadence matters.
+//
+// Anything a platform genuinely does not expose is stored as 0 and rendered
+// as an em-dash — CLAUDE.md hard-rule 1. Instagram, for example, reports no
+// view count on static image posts. We never synthesize one.
+// -----------------------------------------------------------------------------
+
+/// One tracked social account. Unique per (brand, platform, handle).
+model SocialAccount {
+  id             String         @id @default(cuid())
+  brandId        String
+  brand          Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  /// 'instagram' | 'facebook' | 'youtube'
+  platform       String
+  /// @handle, page slug, or channel id — whatever addresses the account.
+  handle         String
+  displayName    String?
+  profileUrl     String?
+  avatarUrl      String?
+  /// True = ours (official API). False = competitor (Apify).
+  isOwn          Boolean        @default(false)
+  /// Display label for competitors: "iQOO", "Nothing", … Null when isOwn.
+  competitorName String?
+  active         Boolean        @default(true)
+  /// Per-account cadence override in seconds. Null = brand default (900s).
+  /// Lets POVA poll fast while competitors poll slow, to control spend.
+  cadenceSec     Int?
+  lastPolledAt   DateTime?
+  /// Last poll failure, surfaced in the UI. Null when the last poll was OK.
+  /// We show stale-with-reason rather than silently serving old numbers.
+  lastError      String?
+  samples        SocialSample[]
+  posts          SocialPost[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([brandId, platform, handle])
+  @@index([brandId, platform])
+  @@index([active, lastPolledAt])
+}
+
+/// Append-only counter reading. One row per poll per account — this is what
+/// makes deltas, sparklines and "+412 today" possible, and it is the same
+/// shape as TrendSample so retention/pruning can treat them alike.
+model SocialSample {
+  id             String        @id @default(cuid())
+  accountId      String
+  account        SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sampledAt      DateTime      @default(now())
+  /// Followers / subscribers. BigInt — channels clear 2^31.
+  followers      BigInt
+  /// Total posts/videos published. Null when the platform doesn't say.
+  postCount      Int?
+  /// Change vs the previous sample, precomputed at write time so the UI
+  /// doesn't need a window function to render the live delta chip.
+  followersDelta BigInt?
+
+  @@index([accountId, sampledAt])
+}
+
+/// A published post/video and its engagement counters.
+model SocialPost {
+  id                String          @id @default(cuid())
+  accountId         String
+  account           SocialAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Platform-native post id. Unique per account so re-polls update in place.
+  externalId        String
+  postedAt          DateTime?
+  caption           String?
+  mediaUrl          String?
+  permalink         String?
+  likes             BigInt          @default(0)
+  /// 0 when the platform exposes no view count (e.g. IG image posts) → '—'.
+  views             BigInt          @default(0)
+  commentCount      Int             @default(0)
+  /// Marks the account's most recent post — the one the tab headlines.
+  isLatest          Boolean         @default(false)
+  /// When comment TEXT was last pulled. Null = never. Comments are fetched
+  /// on demand only, so this is how the UI knows whether to offer "load".
+  commentsFetchedAt DateTime?
+  comments          SocialComment[]
+  firstSeenAt       DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([accountId, externalId])
+  @@index([accountId, postedAt])
+  @@index([accountId, isLatest])
+}
+
+/// An individual comment on a post. Fetched on demand.
+model SocialComment {
+  id         String     @id @default(cuid())
+  postId     String
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  externalId String
+  author     String?
+  text       String
+  likes      Int        @default(0)
+  postedAt   DateTime?
+  /// -1..1. Populated only when a premium AI key is live; null = not analyzed.
+  /// Never inferred from keywords — an unanalyzed comment stays null.
+  sentiment  Float?
+  fetchedAt  DateTime   @default(now())
+
+  @@unique([postId, externalId])
+  @@index([postId, postedAt])
 }
