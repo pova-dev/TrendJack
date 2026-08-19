@@ -36,7 +36,7 @@
 // Google deploy.
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 import { classifyTrendCategory, type GtrendsCategoryId } from '@/lib/gtrends-classifier';
 
 const RPC_ID = 'i0OFE';
@@ -88,13 +88,17 @@ export class GoogleTrendsRealtimeConnector implements Connector {
       if (it.title.trim().length < 3) continue;
       if (!matchKw && !emitAll && competitorClaimants.length === 0) continue;
 
-      // Classify by title + first related term as a host-less proxy.
-      // The realtime RPC doesn't ship per-trend article URLs in the
-      // first call (only opaque article ids). Using related terms +
-      // title gives the title-keyword fallback enough context.
+      // Classify by title + ALL related terms as a host-less proxy.
+      // The realtime RPC doesn't ship per-trend article URLs (only
+      // opaque article ids). Audit 2026-05-29 — passing the full related
+      // term list rather than just relatedTerms[0] is what makes the
+      // sci-tech / sports / business / entertainment columns actually
+      // populate (single-word trends like "rahul tewatia" only classify
+      // correctly when "ipl"/"royals" appear in the related list).
       const cat: GtrendsCategoryId = classifyTrendCategory({
         title: it.title,
         newsSource: it.relatedTerms[0],
+        relatedTerms: it.relatedTerms,
       });
       if (filterByCategory && !wantedCats.has(cat) && !matchKw && competitorClaimants.length === 0) {
         continue;

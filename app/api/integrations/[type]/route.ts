@@ -21,9 +21,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ type: stri
       return NextResponse.json(await sendToSlack(body));
     case 'sheets':
       return NextResponse.json(await exportToSheets(body));
-    case 'notion':
     case 'webhook':
+      // Generic JSON POST. Honest about what it does.
       return NextResponse.json(await sendWebhook(body));
+    case 'notion':
+      // Audit 2026-05-29 D5 — the previous code routed `notion` through
+      // `sendWebhook`, which is a generic JSON POST. Notion's API requires
+      // `Notion-Version` headers and bearer auth, so the call always failed
+      // silently. Until the @notionhq/client adapter lands, refuse the
+      // request rather than fail mysteriously.
+      return NextResponse.json({
+        ok: false,
+        error: 'notion_integration_not_implemented',
+        message: 'Native Notion integration is not built yet. Use the generic webhook target with a Notion automation (e.g. Zapier / Make.com / n8n) as a bridge.',
+      }, { status: 501 });
     default:
       return NextResponse.json({ error: 'unknown_integration' }, { status: 400 });
   }

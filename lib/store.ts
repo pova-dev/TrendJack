@@ -20,7 +20,7 @@ import type {
   Trend,
 } from '@/types';
 import { DEFAULT_WEIGHTS } from '@/types';
-import { score, type RawSignal } from '@/lib/scoring/engine';
+import { score, type RawSignal } from '@/src/core/scoring';
 import { forecastPeak } from '@/src/core/scoring/cascade';
 
 // -----------------------------------------------------------------------------
@@ -112,13 +112,40 @@ export async function listTrends(brandId: string, opts: ListTrendOpts = {}): Pro
   // ──────────────────────────────────────────────────────────────────────
   const limit = opts.limit ?? 200;
 
-  const [priorityRows, recentRows] = await Promise.all([
+  // Audit 2026-05-29 — three-way priority union:
+  //
+  //   1. brandKeywordHit | pinned   — small set, ALWAYS included
+  //   2. source='custom'            — deterministic competitor-tracking
+  //                                   surfaces (Meta Ad Library,
+  //                                   X-Trending). Tiny (25-100 rows),
+  //                                   ALWAYS included with no cap.
+  //   3. competitorClaimed=true     — huge set (every news article
+  //                                   mentioning a competitor). Capped
+  //                                   to top-N newest so it doesn't
+  //                                   crowd out the rest.
+  //   4. recentRows                 — top-N newest for general coverage
+  //
+  // Previously we lumped 1-3 under one OR with take:800. competitorClaimed
+  // had 9,670 rows for the POVA brand, swamping the 800-row cap and
+  // pushing the 25 custom rows (9 days old) clean out of the result.
+  // Splitting gives custom a guaranteed slot.
+  const [brandKwPinned, customRows, competitorRows, recentRows] = await Promise.all([
     prisma.trend.findMany({
       where: { ...where, OR: [{ brandKeywordHit: true }, { pinned: true }] },
       orderBy: { firstSeenAt: 'desc' },
-      // Hard cap to prevent runaway result sizes if a brand somehow has
-      // thousands of brand-keyword hits or pinned items.
       take: 500,
+    }),
+    prisma.trend.findMany({
+      where: { ...where, source: 'custom' },
+      orderBy: { firstSeenAt: 'desc' },
+      // Source-custom is operator-explicit competitor tracking. Always
+      // surface all of them; the connectors emit small fixed counts.
+      take: 200,
+    }),
+    prisma.trend.findMany({
+      where: { ...where, competitorClaimed: true },
+      orderBy: { firstSeenAt: 'desc' },
+      take: 400,
     }),
     prisma.trend.findMany({
       where,
@@ -126,6 +153,7 @@ export async function listTrends(brandId: string, opts: ListTrendOpts = {}): Pro
       orderBy: { firstSeenAt: 'desc' },
     }),
   ]);
+  const priorityRows = [...brandKwPinned, ...customRows, ...competitorRows];
 
   const seen = new Set<string>();
   const merged: typeof priorityRows = [];
@@ -333,14 +361,23 @@ export async function getDefaultBoard(brandId: string, ownerId: string): Promise
   return row ? rowToBoard(row) : null;
 }
 
-export async function getBoard(boardId: string): Promise<BoardConfig | null> {
+// SECURITY: brandId is REQUIRED. Without it, any logged-in user could read
+// boards from other orgs via /api/boards?id=<arbitrary>. Audit 2026-05-29 B1.
+export async function getBoard(boardId: string, brandId: string): Promise<BoardConfig | null> {
   const row = await prisma.board.findUnique({ where: { id: boardId } });
-  return row ? rowToBoard(row) : null;
+  if (!row || row.brandId !== brandId) return null;
+  return rowToBoard(row);
 }
 
+// SECURITY: prevents cross-tenant board mutation. If a caller passes an id
+// that already belongs to another brand, refuse the update and create a new
+// row instead. Audit 2026-05-29 B2.
 export async function saveBoard(b: BoardConfig & { brandId: string; ownerId: string }): Promise<BoardConfig> {
   const existing = await prisma.board.findUnique({ where: { id: b.id } });
   if (existing) {
+    if (existing.brandId !== b.brandId) {
+      throw new Error('board_id_collision_across_brands');
+    }
     const updated = await prisma.board.update({
       where: { id: b.id },
       data: { name: b.name, columns: JSON.stringify(b.columns), shared: b.shared },
@@ -364,9 +401,11 @@ export async function saveBoard(b: BoardConfig & { brandId: string; ownerId: str
 // Drafts
 // -----------------------------------------------------------------------------
 
-export async function listDrafts(trendId?: string): Promise<Draft[]> {
+// SECURITY: brandId is REQUIRED. Audit 2026-05-29 S1 — copilot was leaking
+// drafts across tenants. Pass trendId to scope further.
+export async function listDrafts(brandId: string, trendId?: string): Promise<Draft[]> {
   const rows = await prisma.draft.findMany({
-    where: trendId ? { trendId } : undefined,
+    where: { brandId, ...(trendId ? { trendId } : {}) },
     orderBy: { createdAt: 'desc' },
   });
   return rows.map(d => ({

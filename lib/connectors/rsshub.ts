@@ -11,7 +11,7 @@
 
 import { XMLParser } from 'fast-xml-parser';
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 import type { SourceId } from '@/types';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });

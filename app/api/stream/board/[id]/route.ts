@@ -8,13 +8,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const board = await getBoard(id);
-  if (!board) return new Response('not_found', { status: 404 });
 
+  // Auth check FIRST — getBoard now requires brandId. Audit 2026-05-29 B1.
   const session = await getCurrentContext();
   if (!session?.brand) return new Response('unauthorized', { status: 401 });
 
   const brandId = session.brand.id;
+  const board = await getBoard(id, brandId);
+  if (!board) return new Response('not_found', { status: 404 });
   const channels = [
     `brand:${brandId}:trends`,
     `brand:${brandId}:profile`,

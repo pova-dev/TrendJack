@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const [trends, boards, drafts, recentAudit] = await Promise.all([
     listTrends(ctx.brand.id, { limit: 50, excludeDismissed: true }),
     listBoardsForBrand(ctx.brand.id, ctx.user.id),
-    listDrafts(),
+    listDrafts(ctx.brand.id),
     prisma.auditLog.findMany({
       where: { orgId: ctx.org.id },
       orderBy: { createdAt: 'desc' },

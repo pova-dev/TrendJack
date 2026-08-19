@@ -6,7 +6,7 @@
 // statistics = 1 unit per video. Practical: 50–100 polls/day.
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 interface SearchItem {
   id: { videoId: string };

@@ -5,9 +5,10 @@
 // router (lib/ai/provider.ts) but for image / video / audio / avatar
 // outputs. Cost / quality / speed tradeoffs are picked per-job.
 //
-// Today this is interface + stub. Production wiring in Phase 8+ adds
-// adapters for: Veo, Sora, Kling, Runway, Luma, Lyria, Suno, Udio,
-// ElevenLabs, Flux Pro, SDXL, DALL-E 3, Midjourney, HeyGen, Synthesia.
+// Audit 2026-05-29 U4 — boot adapters via `src/core/media/boot.ts`.
+// First live adapter: DALL-E 3 for images (activates when OPENAI_API_KEY
+// is set). Add more in `src/core/media/adapters/*.ts` and register them
+// in `boot.ts`.
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'avatar';
 export type Quality = 'draft' | 'social' | 'broadcast';

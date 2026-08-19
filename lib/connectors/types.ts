@@ -1,5 +1,5 @@
 import type { SourceId, ConnectorMode } from '@/types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 export interface ConnectorPollOpts {
   since?: Date;

@@ -27,7 +27,11 @@ export default async function AlertsPage() {
       />
       <div className="flex-1 overflow-y-auto p-6 max-w-4xl">
         <h1 className="text-xl font-semibold text-ink-100 mb-1">Alert rules</h1>
-        <p className="text-sm text-ink-300 mb-6">Threshold-based. Prioritized P0–P3. Phase 3 ships the rule editor and history feed.</p>
+        <p className="text-sm text-ink-300 mb-3">Threshold-based. Prioritized P0–P3.</p>
+        {/* Audit 2026-05-29 U2 — make the preview state unmissable. */}
+        <div className="mb-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          <strong>Preview only.</strong> These rules don&apos;t fire yet — they&apos;re a UI mock of the Phase 3 rule editor. No alerts are being sent.
+        </div>
         <div className="rounded-md border border-ink-700 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-ink-800 text-2xs uppercase tracking-wider text-ink-300">

@@ -23,7 +23,7 @@
 // per CLAUDE.md hard rule 1.
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 // Country name → trends24 path slug. Lowercase, dash-separated.
 const COUNTRY_SLUG: Record<string, string> = {

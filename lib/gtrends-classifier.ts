@@ -61,6 +61,11 @@ interface ClassifierInput {
   articleUrl?: string;
   /** Trend title from <title>. Used as a title-keyword fallback. */
   title: string;
+  /** Related search terms from the realtime API. Often holds more
+   *  category-bearing tokens than the trend's bare title (a one-word
+   *  trend like "rahul tewatia" reveals itself as cricket only via
+   *  related terms like "rajasthan royals", "ipl"). Audit 2026-05-29. */
+  relatedTerms?: string[];
 }
 
 export function classifyTrendCategory(input: ClassifierInput): GtrendsCategoryId {
@@ -74,10 +79,16 @@ export function classifyTrendCategory(input: ClassifierInput): GtrendsCategoryId
     if (re.test(haystack)) return id;
   }
 
-  // 2. Title keywords — weaker. Fired only when no host matched.
-  const t = input.title.toLowerCase();
+  // 2. Title + related-terms keyword match. Audit 2026-05-29 — the
+  // realtime Google Trends connector doesn't carry article URLs, so the
+  // host rules above never fire. Title alone is too sparse for bare
+  // person/place names ("rahul tewatia", "कल का मौसम"). Joining related
+  // terms in surfaces the cricket/weather/launch context the operator
+  // intuits when they see the trend on Google.
+  const blob = [input.title, ...(input.relatedTerms ?? [])]
+    .filter(Boolean).join(' ').toLowerCase();
   for (const [re, id] of TITLE_RULES) {
-    if (re.test(t)) return id;
+    if (re.test(blob)) return id;
   }
 
   // 3. Default — general news / top stories.

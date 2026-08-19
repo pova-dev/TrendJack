@@ -8,7 +8,7 @@
 // drop-in interchangeable; pick from /connectors page in the UI.
 
 import type { Connector, ConnectorPollOpts, ConnectorResult } from './types';
-import type { RawSignal } from '@/lib/scoring/engine';
+import type { RawSignal } from '@/src/core/scoring';
 
 interface XTweet {
   id: string;

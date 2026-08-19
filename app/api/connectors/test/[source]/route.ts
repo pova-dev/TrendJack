@@ -16,7 +16,10 @@ export async function POST(_req: Request, ctx: { params: Promise<{ source: strin
   const auth = await getCurrentContext();
   if (!auth?.brand || !auth.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { source } = await ctx.params;
-  const valid: SourceId[] = ['x', 'reddit', 'youtube', 'tiktok', 'google_trends', 'news', 'custom'];
+  // Audit 2026-05-29 B4 — IG/FB were missing here even though the registry
+  // exposes them. The TestButton on those rows now returns the unconfigured
+  // state instead of "invalid_source".
+  const valid: SourceId[] = ['x', 'reddit', 'youtube', 'tiktok', 'instagram', 'facebook', 'google_trends', 'news', 'custom'];
   if (!valid.includes(source as SourceId)) {
     return NextResponse.json({ error: 'invalid_source' }, { status: 400 });
   }

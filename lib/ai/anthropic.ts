@@ -88,10 +88,5 @@ function makeBrandAgnosticVariants(t: Trend, b: BrandProfile): DraftBase[] {
   ];
 }
 
-// -----------------------------------------------------------------------------
-// Phase 2 entry point — wired to Anthropic SDK with Sonnet 4.6 / Opus 4.7.
-// Stubbed here for tooling; Phase 2 fills implementation.
-// -----------------------------------------------------------------------------
-export async function generateDraftsLive(_trend: Trend, _brand: BrandProfile): Promise<Draft[]> {
-  throw new Error('not_implemented_in_phase_1');
-}
+// Phase 2 entry point removed 2026-05-29 — the real implementation lives in
+// lib/ai/draft-gen.ts. This stub never had a caller and was just a footgun.

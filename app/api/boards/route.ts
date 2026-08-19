@@ -7,7 +7,8 @@ export async function GET(req: NextRequest) {
   if (!ctx?.brand) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const id = req.nextUrl.searchParams.get('id');
   if (id) {
-    const b = await getBoard(id);
+    // getBoard now requires brandId; returns null on cross-tenant access.
+    const b = await getBoard(id, ctx.brand.id);
     if (!b) return NextResponse.json({ error: 'not_found' }, { status: 404 });
     return NextResponse.json(b);
   }

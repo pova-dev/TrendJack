@@ -23,6 +23,17 @@ export async function POST(req: NextRequest) { return run(req); }
 async function run(req: NextRequest) {
   const vercelSecret = process.env.CRON_SECRET;
   const tjToken      = process.env.TJ_CRON_TOKEN;
+
+  // SECURITY: in production, one of the two MUST be set. Otherwise the
+  // endpoint is open and anyone can trigger ingest + AI spend across every
+  // brand. Audit 2026-05-29 S3.
+  if (process.env.NODE_ENV === 'production' && !vercelSecret && !tjToken) {
+    return NextResponse.json(
+      { error: 'cron_token_required', message: 'Set CRON_SECRET or TJ_CRON_TOKEN in production.' },
+      { status: 500 },
+    );
+  }
+
   if (vercelSecret) {
     const got = req.headers.get('authorization');
     if (got !== `Bearer ${vercelSecret}`) {
