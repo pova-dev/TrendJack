@@ -21,14 +21,22 @@ function resolveSecret(): string {
   }
   return env || 'dev-only-insecure-secret-please-change-to-32+chars-in-prod';
 }
-const SECRET = resolveSecret();
-const KEY = crypto.createHash('sha256').update(SECRET).digest(); // 32 bytes
+// Derived lazily, on first encrypt/decrypt — NOT at module load. See the
+// note in lib/auth/session.ts: `next build` imports every route module with
+// NODE_ENV=production to collect page data, so a module-scope hard-fail made
+// the app unbuildable without a runtime secret. The guard still fires on the
+// first real credential operation in production.
+let KEY_CACHE: Buffer | undefined;
+function key(): Buffer {
+  if (!KEY_CACHE) KEY_CACHE = crypto.createHash('sha256').update(resolveSecret()).digest(); // 32 bytes
+  return KEY_CACHE;
+}
 const IV_LEN = 12;
 
 export function encrypt(plain: string): string {
   if (!plain) return '';
   const iv = crypto.randomBytes(IV_LEN);
-  const cipher = crypto.createCipheriv('aes-256-gcm', KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key(), iv);
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, data]).toString('base64');
@@ -41,7 +49,7 @@ export function decrypt(envelope: string): string {
   const iv = buf.subarray(0, IV_LEN);
   const tag = buf.subarray(IV_LEN, IV_LEN + 16);
   const data = buf.subarray(IV_LEN + 16);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key(), iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }
