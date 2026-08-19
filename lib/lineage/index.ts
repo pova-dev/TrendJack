@@ -118,11 +118,20 @@ ${evidenceBlock || 'WEB EVIDENCE: please search the web yourself for verificatio
 
 Produce the JSON lineage report now.`;
 
-  // Use 'balanced' tier; Sonar will route by model name even if tier ==
-  // balanced — what matters is that runChat picks Sonar when OpenRouter
-  // is set as the balanced provider.
+  // PREMIUM, not balanced.
+  //
+  // The previous comment here claimed "Sonar will route by model name even if
+  // tier == balanced". That was wrong: runChat() derives the model purely from
+  // pickRouting(tier, credentials) and accepts no model override, so with an
+  // OpenRouter key present `balanced` resolved to meta-llama/llama-3.3-70b —
+  // a free model writing a user-visible lineage report. CLAUDE.md hard-rule 3
+  // forbids exactly that.
+  //
+  // Cost is bounded: probeLineage() is only reachable from the on-demand route
+  // /api/trends/[id]/lineage. The lineage CRON (lib/lineage-cron.ts) uses the
+  // pure buildLineageLookup() and makes no AI calls at all.
   const ai = await runChat({
-    tier: 'balanced',
+    tier: 'premium',
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPayload }],
     maxTokens: 1400,
