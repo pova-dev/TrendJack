@@ -8,6 +8,7 @@ import { startLineageCron } from '@/lib/lineage-cron';
 import { startPlanLifecycleCron } from '@/lib/plan-cron';
 import { bootMediaAdapters } from '@/src/core/media/boot';
 import { startSocialPollCron } from '@/lib/social/poller';
+import { startRetentionCron } from '@/lib/retention';
 
 // Boot the background ingest cron + agentic pipeline + lineage cron +
 // media adapters once per Node process. All are idempotent via
@@ -28,6 +29,7 @@ startLineageCron();
 startPlanLifecycleCron();
 bootMediaAdapters();
 startSocialPollCron();
+startRetentionCron();
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();
