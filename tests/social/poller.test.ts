@@ -32,17 +32,31 @@ describe('pickProvider', () => {
     expect(pickProvider('instagram', false, FULL).provider?.id).toBe('apify:instagram-profile');
   });
 
-  it('refuses Facebook, because nothing configured reports page followers', () => {
+  it('refuses competitor Facebook, because nothing configured reports page followers', () => {
     // The configured Facebook actor is addressed by post URL and returns no
-    // follower count. Saying "supported" here would schedule a poll that can
-    // only fail, over and over.
+    // follower count. Saying "supported" would schedule a poll that can only
+    // fail, over and over.
     const rival = pickProvider('facebook', false, FULL);
     expect(rival.provider).toBeNull();
     expect('reason' in rival && rival.reason).toMatch(/post URL|followers/i);
+  });
 
-    const own = pickProvider('facebook', true, FULL);
-    expect(own.provider).toBeNull();
-    expect('reason' in own && own.reason).toMatch(/META_ACCESS_TOKEN/);
+  it('uses Meta Graph for accounts we own', () => {
+    const withMeta = { ...FULL, META_ACCESS_TOKEN: 'meta' };
+    expect(pickProvider('facebook', true, withMeta).provider?.id).toBe('meta-graph:facebook');
+    // Own Instagram prefers Graph over Apify: free, exact, and it returns
+    // comment text that no configured actor does.
+    expect(pickProvider('instagram', true, withMeta).provider?.id).toBe('meta-graph:instagram');
+  });
+
+  it('never uses Graph for a competitor, which it cannot read', () => {
+    const withMeta = { ...FULL, META_ACCESS_TOKEN: 'meta' };
+    expect(pickProvider('instagram', false, withMeta).provider?.id).toBe('apify:instagram-profile');
+    expect(pickProvider('facebook', false, withMeta).provider).toBeNull();
+  });
+
+  it('falls back to Apify for own Instagram when Meta is not configured', () => {
+    expect(pickProvider('instagram', true, FULL).provider?.id).toBe('apify:instagram-profile');
   });
 
   it('explains exactly which credential is missing', () => {

@@ -16,6 +16,7 @@ import { bus } from '@/lib/realtime/bus';
 import { providerReady, SocialProviderError, type SocialProvider, type SocialPlatform } from './types';
 import { youtubeApi } from './youtube';
 import { apifyInstagramProfile } from './apify';
+import { metaInstagram, metaFacebook } from './meta';
 
 /** Default cadence. Matches the 15-minute decision in the build plan: fast
  *  enough that deltas feel live, slow enough that Apify stays affordable. */
@@ -44,15 +45,25 @@ export function pickProvider(
   }
 
   if (platform === 'instagram') {
-    return providerReady(apifyInstagramProfile, creds)
-      ? { provider: apifyInstagramProfile }
-      : { provider: null, reason: 'Add APIFY_TOKEN and APIFY_ACTOR_INSTAGRAM_PROFILE in Settings to track Instagram.' };
+    // Own accounts prefer Graph: free, exact, and it returns comment text,
+    // which no configured Apify actor does. Apify is the fallback, and the
+    // only option for competitors.
+    if (isOwn && providerReady(metaInstagram, creds)) return { provider: metaInstagram };
+    if (providerReady(apifyInstagramProfile, creds)) return { provider: apifyInstagramProfile };
+    return {
+      provider: null,
+      reason: isOwn
+        ? 'Add META_ACCESS_TOKEN for your own Instagram (free and exact), or APIFY_TOKEN + APIFY_ACTOR_INSTAGRAM_PROFILE.'
+        : 'Add APIFY_TOKEN and APIFY_ACTOR_INSTAGRAM_PROFILE in Settings to track competitor Instagram.',
+    };
   }
+
+  if (isOwn && providerReady(metaFacebook, creds)) return { provider: metaFacebook };
 
   return {
     provider: null,
     reason: isOwn
-      ? 'Facebook needs META_ACCESS_TOKEN for pages you own. Not configured yet.'
+      ? 'Add META_ACCESS_TOKEN to track your own Facebook Page. It is free and exact.'
       : 'No configured source reports Facebook page followers. The Facebook actor reads posts by URL only.',
   };
 }
