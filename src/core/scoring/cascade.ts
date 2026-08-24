@@ -258,8 +258,23 @@ export function forecastPeak(samples: TrendTimeSample[]): CascadeForecast {
   }
 
   // t₀ in hours-since-epoch. Convert to a Date.
+  //
+  // A slope that survives the r > 0 check above can still be small enough that
+  // -intercept/slope explodes. Multiplied out it lands outside the ±8.64e15 ms
+  // that Date accepts, and `new Date()` silently yields an Invalid Date rather
+  // than throwing. Prisma then rejects the write, which is what produced 7,478
+  // "Provided Date object is invalid" failures per log: every forecast write
+  // for an almost-flat curve.
+  //
+  // No forecast beats a corrupt one, so degenerate fits return null the same
+  // way the den === 0 and r <= 0 branches already do.
   const t0Hours = -intercept / slope;
-  const predictedPeakAt = new Date(t0Hours * 3_600_000);
+  const t0Ms = t0Hours * 3_600_000;
+  const MAX_DATE_MS = 8.64e15;
+  if (!Number.isFinite(t0Ms) || Math.abs(t0Ms) > MAX_DATE_MS) {
+    return { predictedPeakAt: null, predictedPeakConfidence: 0, phase: 'pre-launch', modelFitR2: 0 };
+  }
+  const predictedPeakAt = new Date(t0Ms);
 
   // R² goodness-of-fit on the 3 points (sanity diagnostic).
   const yPred = (t: number) => slope * t + intercept;

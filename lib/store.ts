@@ -722,6 +722,12 @@ export async function persistScoredTrend(
  *
  *  Idempotent — safe to call on every persist tick. Returns silently
  *  when there isn't enough history to forecast. */
+/** A Date that Prisma will actually accept. `new Date(NaN)` and dates past the
+ *  ±8.64e15 ms limit are still Date instances, so `instanceof` proves nothing. */
+function isUsableDate(d: Date | null | undefined): d is Date {
+  return d instanceof Date && Number.isFinite(d.getTime());
+}
+
 async function maybeWriteForecast(trendId: string): Promise<void> {
   const samples = await prisma.trendSample.findMany({
     where: { trendId },
@@ -747,7 +753,11 @@ async function maybeWriteForecast(trendId: string): Promise<void> {
     recommendation?: string;
     recommendationReason?: string;
   } = {
-    predictedPeakAt: f.predictedPeakAt,
+    // Belt and braces on top of the range guard in cascade.ts. An Invalid Date
+    // is still a Date object, so it passes type checks and only fails at the
+    // Prisma boundary, taking the whole forecast write with it. Drop it to null
+    // here rather than let one bad fit abort ingestion for that trend.
+    predictedPeakAt: isUsableDate(f.predictedPeakAt) ? f.predictedPeakAt : null,
     predictedPeakConfidence: f.predictedPeakConfidence,
     cascadePhase: f.phase,
   };

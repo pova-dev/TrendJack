@@ -5,6 +5,7 @@ import { BoardColumn } from './BoardColumn';
 import { DetailDrawer } from '@/components/drawer/DetailDrawer';
 import { applyColumnFilter, assignTrendsToColumns } from '@/lib/columns';
 import { useBoardStream } from '@/lib/realtime/use-board-stream';
+import { createCoalescer } from '@/lib/realtime/coalesce';
 import { ColumnBuilder } from './ColumnBuilder';
 
 interface Props {
@@ -20,14 +21,35 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
   const [tickAt, setTickAt] = React.useState<Date>(new Date());
   const [columnEditor, setColumnEditor] = React.useState<{ open: boolean; col?: ColumnConfig } | null>(null);
 
-  const refetch = React.useCallback(async () => {
+  // Refresh failure, surfaced instead of swallowed. Previously a dead API left
+  // the board showing stale cards forever with nothing to indicate it had
+  // stopped updating, which is the worst possible failure for a war room.
+  const [refreshError, setRefreshError] = React.useState<string | null>(null);
+
+  // Ingestion arrives in bursts: one cron tick inserts 100+ trends and every
+  // insert publishes its own SSE event. Refetching per event produced ~125
+  // requests per minute from a single idle tab, each one a ~840ms scan over
+  // the trend table. Measured at ~7,500 requests/hour with nobody touching it.
+  //
+  // Coalesce instead. Burst events collapse into one refetch, and only one
+  // request is ever in flight: anything that arrives mid-flight sets a flag so
+  // exactly one more run follows, which keeps the board current without
+  // stampeding the API.
+  const coalescer = React.useMemo(() => createCoalescer(async () => {
     try {
       const res = await fetch('/api/trends?excludeDismissed=true&limit=200', { cache: 'no-store' });
-      const json = await res.json();
-      setTrends(json.items as Trend[]);
+      if (!res.ok) throw new Error(`refresh failed (HTTP ${res.status})`);
+      const json = await res.json() as { items: Trend[] };
+      setTrends(json.items);
       setTickAt(new Date());
-    } catch { /* swallow */ }
-  }, []);
+      setRefreshError(null);
+    } catch (e) {
+      setRefreshError((e as Error).message || 'refresh failed');
+    }
+  }, 1_500), []);
+
+  const refetch = React.useCallback(() => coalescer.trigger(), [coalescer]);
+  React.useEffect(() => () => coalescer.cancel(), [coalescer]);
 
   // Realtime: any trend or weight or profile change → refetch the slice.
   useBoardStream(board.id, {
@@ -181,6 +203,14 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
   //   Desktop (≥sm): traditional horizontal scroll, multiple columns visible.
   return (
     <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden bg-ink-900 snap-x snap-mandatory sm:snap-none">
+      {refreshError && (
+        <div
+          role="status"
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-1.5 text-2xs font-mono text-signal-amber"
+        >
+          Showing last known data. {refreshError}
+        </div>
+      )}
       {board.columns.map((col, idx) => (
         <React.Fragment key={col.id}>
           {/* Drop slot before this column */}
