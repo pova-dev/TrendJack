@@ -7,6 +7,7 @@ import { bootAgents } from '@/lib/agents-boot';
 import { startLineageCron } from '@/lib/lineage-cron';
 import { startPlanLifecycleCron } from '@/lib/plan-cron';
 import { bootMediaAdapters } from '@/src/core/media/boot';
+import { startSocialPollCron } from '@/lib/social/poller';
 
 // Boot the background ingest cron + agentic pipeline + lineage cron +
 // media adapters once per Node process. All are idempotent via
@@ -18,11 +19,15 @@ import { bootMediaAdapters } from '@/src/core/media/boot';
 //     per-trend fingerprint scan.
 //   - bootMediaAdapters(): registers DALL-E 3 + future image/video
 //     adapters with the multi-model media router.
+//   - startSocialPollCron(): refreshes social follower/engagement counters
+//     on each account's cadence (15 min default). Checks every minute for
+//     accounts that are due; does nothing when none are configured.
 startIngestCron();
 bootAgents();
 startLineageCron();
 startPlanLifecycleCron();
 bootMediaAdapters();
+startSocialPollCron();
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();
