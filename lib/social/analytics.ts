@@ -230,13 +230,13 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
           headline: days <= 90
             ? `On pace to pass ${above.label} in about ${days} days`
             : `Closing on ${above.label}`,
-          detail: `You are gaining ${Math.round(me.growth.perDay).toLocaleString()} followers a day against their ${Math.round(above.growth.perDay).toLocaleString()}, across a gap of ${gap.toLocaleString()}.`,
+          detail: `You are gaining ${Math.round(me.growth.perDay).toLocaleString('en-US')} followers a day against their ${Math.round(above.growth.perDay).toLocaleString('en-US')}, across a gap of ${gap.toLocaleString('en-US')}.`,
         });
       } else if (closing < 0) {
         out.push({
           kind: 'gap-widening', weight: 80, platform, rival: above.label,
           headline: `${above.label} is pulling away`,
-          detail: `They are gaining ${Math.round(above.growth.perDay).toLocaleString()} a day to your ${Math.round(me.growth.perDay).toLocaleString()}, widening a ${gap.toLocaleString()} follower gap.`,
+          detail: `They are gaining ${Math.round(above.growth.perDay).toLocaleString('en-US')} a day to your ${Math.round(me.growth.perDay).toLocaleString('en-US')}, widening a ${gap.toLocaleString('en-US')} follower gap.`,
         });
       }
     }
@@ -250,13 +250,13 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
       if (ratio !== null && ratio >= 1.25) {
         out.push({
           kind: 'engagement-lead', weight: 85, platform,
-          headline: `Your audience engages ${ratio.toFixed(1)}x harder than theirs`,
+          headline: `Your ${platform} audience engages ${ratio.toFixed(1)}x harder than theirs`,
           detail: `${me.engagementRatePct.toFixed(2)}% on your latest post against a ${avg.toFixed(2)}% field average. Reach is the constraint, not content.`,
         });
       } else if (ratio !== null && ratio <= 0.75) {
         out.push({
           kind: 'engagement-lag', weight: 90, platform,
-          headline: `Engagement is running below the field`,
+          headline: `Engagement on ${platform} is running below the field`,
           detail: `${me.engagementRatePct.toFixed(2)}% against a ${avg.toFixed(2)}% average. Followers are not the problem; what you post to them is.`,
         });
       }
@@ -269,14 +269,17 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
       if (avg > 0 && me.growth.perDay > avg * 1.25) {
         out.push({
           kind: 'growth-lead', weight: 75, platform,
-          headline: 'Growing faster than the field',
-          detail: `${Math.round(me.growth.perDay).toLocaleString()} followers a day against a field average of ${Math.round(avg).toLocaleString()}.`,
+          // Named per platform: an operator scanning the feed sees these side
+          // by side, and two identical headlines read as a duplicate rather
+          // than as two findings.
+          headline: `Growing faster than the field on ${platform}`,
+          detail: `${Math.round(me.growth.perDay).toLocaleString('en-US')} followers a day against a field average of ${Math.round(avg).toLocaleString('en-US')}.`,
         });
       } else if (me.growth.perDay < avg * 0.75) {
         out.push({
           kind: 'growth-lag', weight: 88, platform,
-          headline: 'Growing slower than the field',
-          detail: `${Math.round(me.growth.perDay).toLocaleString()} a day against a field average of ${Math.round(avg).toLocaleString()}.`,
+          headline: `Growing slower than the field on ${platform}`,
+          detail: `${Math.round(me.growth.perDay).toLocaleString('en-US')} a day against a field average of ${Math.round(avg).toLocaleString('en-US')}.`,
         });
       }
     }

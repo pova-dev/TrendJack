@@ -150,13 +150,17 @@ describe('generateBriefNarrative', () => {
 
 describe('fallbackSummary', () => {
   it('is entirely computed and quotes real totals', () => {
+    // Locale is pinned to en-US throughout. A bare toLocaleString() here
+    // formats as 1,03,500 on an en-IN machine while the source produces
+    // 103,500, which is precisely the server/client divergence that caused a
+    // real hydration mismatch on the social page.
     const b = BRIEF();
     const s = fallbackSummary(b);
-    expect(s).toContain(b.facts.ownFollowersTotal!.toLocaleString());
+    expect(s).toContain(b.facts.ownFollowersTotal!.toLocaleString('en-US'));
     expect(unsupportedNumbers(s, new Set([
-      b.facts.ownFollowersTotal!.toLocaleString(),
-      Math.abs(b.facts.ownFollowersDelta ?? 0).toLocaleString(),
-      ...b.rows.map(r => r.followers.toLocaleString()),
+      b.facts.ownFollowersTotal!.toLocaleString('en-US'),
+      Math.abs(b.facts.ownFollowersDelta ?? 0).toLocaleString('en-US'),
+      ...b.rows.map(r => r.followers.toLocaleString('en-US')),
       ...b.opportunities.flatMap(o => (`${o.headline} ${o.detail}`.match(/[\d,]+(?:\.\d+)?/g) ?? [])),
     ]))).toEqual([]);
   });

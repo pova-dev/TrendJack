@@ -57,8 +57,8 @@ export function briefToPrompt(brief: DailyBrief): string {
 
   lines.push('OUR POSITION');
   lines.push(`  accounts tracked: ${f.accountsTracked}${f.accountsAwaitingData ? ` (${f.accountsAwaitingData} awaiting first reading)` : ''}`);
-  if (f.ownFollowersTotal !== null) lines.push(`  our total followers: ${f.ownFollowersTotal.toLocaleString()}`);
-  if (f.ownFollowersDelta !== null) lines.push(`  change over window: ${f.ownFollowersDelta >= 0 ? '+' : ''}${f.ownFollowersDelta.toLocaleString()}`);
+  if (f.ownFollowersTotal !== null) lines.push(`  our total followers: ${f.ownFollowersTotal.toLocaleString('en-US')}`);
+  if (f.ownFollowersDelta !== null) lines.push(`  change over window: ${f.ownFollowersDelta >= 0 ? '+' : ''}${f.ownFollowersDelta.toLocaleString('en-US')}`);
   if (f.bestPlatform) lines.push(`  strongest platform: ${f.bestPlatform.platform}, rank ${f.bestPlatform.rank} of ${f.bestPlatform.of}`);
   if (f.worstPlatform) lines.push(`  weakest platform: ${f.worstPlatform.platform}, rank ${f.worstPlatform.rank} of ${f.worstPlatform.of}`);
 
@@ -70,12 +70,12 @@ export function briefToPrompt(brief: DailyBrief): string {
       const bits = [
         `rank ${r.rank}`,
         `${r.label}${r.isOwn ? ' (US)' : ''}`,
-        `${r.followers.toLocaleString()} followers`,
+        `${r.followers.toLocaleString('en-US')} followers`,
         `${r.sharePct.toFixed(1)}% share`,
       ];
-      if (r.growth.perDay !== null) bits.push(`${r.growth.perDay >= 0 ? '+' : ''}${Math.round(r.growth.perDay).toLocaleString()}/day`);
+      if (r.growth.perDay !== null) bits.push(`${r.growth.perDay >= 0 ? '+' : ''}${Math.round(r.growth.perDay).toLocaleString('en-US')}/day`);
       if (r.engagementRatePct !== null) bits.push(`${r.engagementRatePct.toFixed(2)}% engagement`);
-      if (r.gapToNext !== null) bits.push(`${r.gapToNext.toLocaleString()} behind the account above`);
+      if (r.gapToNext !== null) bits.push(`${r.gapToNext.toLocaleString('en-US')} behind the account above`);
       lines.push(`  ${bits.join(' | ')}`);
     }
   }
@@ -222,8 +222,8 @@ export function fallbackSummary(brief: DailyBrief): string {
     const d = f.ownFollowersDelta;
     parts.push(
       d === null || d === 0
-        ? `${f.ownFollowersTotal.toLocaleString()} followers across your channels.`
-        : `${f.ownFollowersTotal.toLocaleString()} followers across your channels, ${d > 0 ? 'up' : 'down'} ${Math.abs(d).toLocaleString()}.`,
+        ? `${f.ownFollowersTotal.toLocaleString('en-US')} followers across your channels.`
+        : `${f.ownFollowersTotal.toLocaleString('en-US')} followers across your channels, ${d > 0 ? 'up' : 'down'} ${Math.abs(d).toLocaleString('en-US')}.`,
     );
   }
   if (f.bestPlatform) parts.push(`Strongest on ${f.bestPlatform.platform} at rank ${f.bestPlatform.rank} of ${f.bestPlatform.of}.`);
@@ -300,10 +300,10 @@ export async function analyzeViralPatterns(
   const lines = ranked.map((p, i) => {
     const bits = [
       `#${i + 1} ${p.label} (${p.platform})`,
-      `${p.likes.toLocaleString()} likes`,
-      `${p.commentCount.toLocaleString()} comments`,
+      `${p.likes.toLocaleString('en-US')} likes`,
+      `${p.commentCount.toLocaleString('en-US')} comments`,
     ];
-    if (p.views > 0) bits.push(`${p.views.toLocaleString()} views`);
+    if (p.views > 0) bits.push(`${p.views.toLocaleString('en-US')} views`);
     if (p.engagementRatePct !== null) bits.push(`${p.engagementRatePct.toFixed(2)}% engagement`);
     const head = bits.join(' | ');
     const cap = p.caption ? `\n     caption: ${p.caption.slice(0, 300)}` : '\n     caption: (none)';

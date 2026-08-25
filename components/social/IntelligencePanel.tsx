@@ -172,8 +172,8 @@ function computedSummary(brief: DailyBrief): string {
     const d = f.ownFollowersDelta;
     parts.push(
       d === null || d === 0
-        ? `${f.ownFollowersTotal.toLocaleString()} followers across your channels.`
-        : `${f.ownFollowersTotal.toLocaleString()} followers across your channels, ${d > 0 ? 'up' : 'down'} ${Math.abs(d).toLocaleString()}.`,
+        ? `${f.ownFollowersTotal.toLocaleString('en-US')} followers across your channels.`
+        : `${f.ownFollowersTotal.toLocaleString('en-US')} followers across your channels, ${d > 0 ? 'up' : 'down'} ${Math.abs(d).toLocaleString('en-US')}.`,
     );
   }
   if (f.bestPlatform) parts.push(`Strongest on ${platformLabel(f.bestPlatform.platform)} at rank ${f.bestPlatform.rank} of ${f.bestPlatform.of}.`);
@@ -215,8 +215,6 @@ function OpportunityCard({ o }: { o: Opportunity }) {
 function StandingsTable({
   rows, historyByAccount,
 }: { rows: RankRow[]; historyByAccount: Record<string, number[]> }) {
-  const leader = rows[0]?.followers ?? 1;
-
   return (
     <div className="rounded-md border border-ink-700 overflow-x-auto">
       <table className="w-full text-sm min-w-[780px]">
@@ -246,13 +244,17 @@ function StandingsTable({
                   {r.isOwn && <span className="text-2xs font-mono text-flare-400/70">you</span>}
                 </div>
               </td>
-              <td className="px-3 py-2.5 text-right text-ink-100 tabular-nums">{r.followers.toLocaleString()}</td>
+              <td className="px-3 py-2.5 text-right text-ink-100 tabular-nums">{r.followers.toLocaleString('en-US')}</td>
               <td className="px-3 py-2.5">
+                {/* The bar shows the same quantity as the number beside it.
+                    Sizing it against the leader while labelling it as share of
+                    total put two different measures side by side, so a 36%
+                    leader read as a full track. */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 rounded-sm bg-ink-800 overflow-hidden">
                     <div
-                      className={`h-full rounded-sm ${r.isOwn ? 'bg-flare-500' : 'bg-ink-600'}`}
-                      style={{ width: `${Math.max(2, (r.followers / leader) * 100)}%` }}
+                      className={`h-full rounded-sm transition-[width] duration-500 ${r.isOwn ? 'bg-flare-500' : 'bg-ink-600'}`}
+                      style={{ width: `${Math.max(2, r.sharePct)}%` }}
                     />
                   </div>
                   <span className="text-2xs font-mono text-ink-400 tabular-nums w-9 text-right">
@@ -267,7 +269,7 @@ function StandingsTable({
                 {r.engagementRatePct === null ? <Dash /> : `${r.engagementRatePct.toFixed(2)}%`}
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-ink-300">
-                {r.gapToNext === null ? <span className="text-2xs font-mono text-ink-500">leader</span> : r.gapToNext.toLocaleString()}
+                {r.gapToNext === null ? <span className="text-2xs font-mono text-ink-500">leader</span> : r.gapToNext.toLocaleString('en-US')}
               </td>
               <td className="px-3 py-2.5">
                 <Sparkline points={historyByAccount[r.accountId] ?? []} width={84} height={20} />
@@ -287,7 +289,7 @@ function Rate({ value }: { value: number | null }) {
   const flat = Math.round(value) === 0;
   return (
     <span className={flat ? 'text-ink-400' : up ? 'text-signal-green' : 'text-signal-red'}>
-      {flat ? '0' : `${up ? '+' : ''}${Math.round(value).toLocaleString()}`}
+      {flat ? '0' : `${up ? '+' : ''}${Math.round(value).toLocaleString('en-US')}`}
     </span>
   );
 }

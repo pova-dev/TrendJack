@@ -80,7 +80,10 @@ export default async function SocialPage() {
         postNowCount={brief.opportunities.length}
       />
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 max-w-[1400px] mx-auto">
+        {/* pb-24 clears the floating AI co-pilot pill, which otherwise sits on
+            top of the last table row on desktop and covers a whole opportunity
+            card on a phone. */}
+        <div className="p-6 pb-24 max-w-[1400px] mx-auto">
           <header className="mb-6">
             <h1 className="text-xl font-semibold text-ink-100 mb-1">Social intelligence</h1>
             <p className="text-sm text-ink-300">
