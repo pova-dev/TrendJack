@@ -290,7 +290,16 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
     }
   }
 
-  return out.sort((a, b) => b.weight - a.weight);
+  // One card per kind, keeping the strongest. Without this the feed shows the
+  // same finding once per platform: three cards all reading "your audience
+  // engages Nx harder" is one insight rendered three times, and a feed of
+  // near-duplicates is why a dashboard starts feeling like noise. The headline
+  // names its platform, so nothing is lost by keeping only the sharpest.
+  const best = new Map<OpportunityKind, Opportunity>();
+  for (const o of out.sort((a, b) => b.weight - a.weight)) {
+    if (!best.has(o.kind)) best.set(o.kind, o);
+  }
+  return [...best.values()].sort((a, b) => b.weight - a.weight);
 }
 
 export interface DailyBrief {

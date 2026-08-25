@@ -14,9 +14,14 @@ const REFRESH_MS = 60_000;
 export function SocialDashboard({
   initial,
   configured,
+  /** Hide the summary tiles when the intelligence panel is already showing
+   *  headline stats above. Two competing summaries on one page is a large
+   *  part of why the first version read as cluttered. */
+  showSummary = true,
 }: {
   initial: AccountView[];
   configured: { apify: boolean; youtube: boolean; meta: boolean };
+  showSummary?: boolean;
 }) {
   const [accounts, setAccounts] = React.useState(initial);
   // `null` until mounted — SSR and first client render must agree.
@@ -47,7 +52,7 @@ export function SocialDashboard({
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <SummaryRow own={own} rivals={rivals} lastSync={lastSync} />
+      {showSummary && <SummaryRow own={own} rivals={rivals} lastSync={lastSync} />}
 
       <Section
         title="Your channels"

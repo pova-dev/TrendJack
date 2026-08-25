@@ -101,7 +101,7 @@ export default async function SocialPage() {
             </div>
           )}
 
-          <SocialDashboard initial={accounts} configured={configured} />
+          <SocialDashboard initial={accounts} configured={configured} showSummary={brief.rows.length === 0} />
         </div>
       </div>
     </>
