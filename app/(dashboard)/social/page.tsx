@@ -83,16 +83,16 @@ export default async function SocialPage() {
         {/* pb-24 clears the floating AI co-pilot pill, which otherwise sits on
             top of the last table row on desktop and covers a whole opportunity
             card on a phone. */}
-        <div className="p-6 pb-24 max-w-[1400px] mx-auto">
+        <div className="p-4 sm:p-6 pb-24 max-w-[1400px] mx-auto">
           <header className="mb-6">
-            <h1 className="text-xl font-semibold text-ink-100 mb-1">Social intelligence</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-ink-100 mb-1">Social intelligence</h1>
             <p className="text-sm text-ink-300">
               Where {brand.name} stands against its competitors, and what to do about it.
             </p>
           </header>
 
           {brief.rows.length > 0 && (
-            <div className="mb-9">
+            <div className="mb-7 sm:mb-9">
               <IntelligencePanel
                 initialBrief={brief}
                 aiAvailable={aiAvailable}

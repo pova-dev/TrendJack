@@ -47,7 +47,7 @@ export function AddAccountForm({ onAdded }: { onAdded: () => void }) {
             type="button"
             onClick={() => setPlatform(p)}
             aria-pressed={platform === p}
-            className={`px-2.5 h-8 rounded-md border text-xs capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 ${
+            className={`px-3 h-9 sm:h-8 rounded-md border text-xs capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 ${
               platform === p
                 ? 'border-flare-500 bg-flare-500/10 text-flare-400'
                 : 'border-ink-700 bg-ink-800 text-ink-300 hover:text-ink-100'
@@ -94,13 +94,19 @@ export function AddAccountForm({ onAdded }: { onAdded: () => void }) {
         </button>
       </div>
 
-      <div className="flex gap-4 text-xs text-ink-300">
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" checked={isOwn} onChange={() => setIsOwn(true)} className="accent-flare-500" />
+      <div className="flex gap-2 text-xs text-ink-300">
+        <label className="flex items-center gap-2 cursor-pointer py-2 pr-3 rounded-md min-h-[36px] hover:text-ink-100 transition-colors">
+          <input
+            type="radio" name="ownership" checked={isOwn} onChange={() => setIsOwn(true)}
+            className="accent-flare-500 w-4 h-4"
+          />
           Ours
         </label>
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" checked={!isOwn} onChange={() => setIsOwn(false)} className="accent-flare-500" />
+        <label className="flex items-center gap-2 cursor-pointer py-2 pr-3 rounded-md min-h-[36px] hover:text-ink-100 transition-colors">
+          <input
+            type="radio" name="ownership" checked={!isOwn} onChange={() => setIsOwn(false)}
+            className="accent-flare-500 w-4 h-4"
+          />
           Competitor
         </label>
       </div>

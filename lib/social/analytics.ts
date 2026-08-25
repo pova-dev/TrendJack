@@ -206,6 +206,11 @@ export interface Opportunity {
  * shown alongside it, which is what makes the panel checkable rather than
  * something you have to take on faith.
  */
+/** Display casing for a platform inside prose. */
+function platformName(p: SocialPlatform): string {
+  return p === 'instagram' ? 'Instagram' : p === 'facebook' ? 'Facebook' : 'YouTube';
+}
+
 export function findOpportunities(rows: RankRow[]): Opportunity[] {
   const own = rows.filter(r => r.isOwn);
   const out: Opportunity[] = [];
@@ -250,13 +255,13 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
       if (ratio !== null && ratio >= 1.25) {
         out.push({
           kind: 'engagement-lead', weight: 85, platform,
-          headline: `Your ${platform} audience engages ${ratio.toFixed(1)}x harder than theirs`,
+          headline: `Your ${platformName(platform)} audience engages ${ratio.toFixed(1)}x harder than theirs`,
           detail: `${me.engagementRatePct.toFixed(2)}% on your latest post against a ${avg.toFixed(2)}% field average. Reach is the constraint, not content.`,
         });
       } else if (ratio !== null && ratio <= 0.75) {
         out.push({
           kind: 'engagement-lag', weight: 90, platform,
-          headline: `Engagement on ${platform} is running below the field`,
+          headline: `Engagement on ${platformName(platform)} is running below the field`,
           detail: `${me.engagementRatePct.toFixed(2)}% against a ${avg.toFixed(2)}% average. Followers are not the problem; what you post to them is.`,
         });
       }
@@ -272,13 +277,13 @@ export function findOpportunities(rows: RankRow[]): Opportunity[] {
           // Named per platform: an operator scanning the feed sees these side
           // by side, and two identical headlines read as a duplicate rather
           // than as two findings.
-          headline: `Growing faster than the field on ${platform}`,
+          headline: `Growing faster than the field on ${platformName(platform)}`,
           detail: `${Math.round(me.growth.perDay).toLocaleString('en-US')} followers a day against a field average of ${Math.round(avg).toLocaleString('en-US')}.`,
         });
       } else if (me.growth.perDay < avg * 0.75) {
         out.push({
           kind: 'growth-lag', weight: 88, platform,
-          headline: `Growing slower than the field on ${platform}`,
+          headline: `Growing slower than the field on ${platformName(platform)}`,
           detail: `${Math.round(me.growth.perDay).toLocaleString('en-US')} a day against a field average of ${Math.round(avg).toLocaleString('en-US')}.`,
         });
       }

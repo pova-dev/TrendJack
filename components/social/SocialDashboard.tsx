@@ -46,7 +46,7 @@ export function SocialDashboard({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <SummaryRow own={own} rivals={rivals} lastSync={lastSync} />
 
       <Section
@@ -82,7 +82,7 @@ function SummaryRow({
   const awaiting = [...own, ...rivals].filter(a => a.followers == null).length;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
       <Tile label="Your followers" hint="across all your channels">
         <LiveCounter value={totalOwn} className="text-2xl font-semibold text-ink-100" />
       </Tile>
@@ -106,7 +106,7 @@ function SummaryRow({
 
 function Tile({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
+    <div className="rounded-md border border-ink-700 bg-ink-900 p-3 sm:p-4">
       <div className="text-2xs font-mono uppercase tracking-wider text-ink-400 mb-2">{label}</div>
       {children}
       {hint && <div className="mt-1.5 text-2xs text-ink-400">{hint}</div>}
@@ -211,7 +211,38 @@ function CompetitorTable({ rows, own }: { rows: AccountView[]; own: AccountView[
   }
 
   return (
-    <div className="rounded-md border border-ink-700 overflow-x-auto">
+    <>
+      {/* Below lg the same rows render as cards. Swiping a 640px table
+          sideways on a phone hides the column you actually came for. */}
+      <div className="lg:hidden space-y-2">
+        {all.map((a, i) => (
+          <div key={a.id} className={`rounded-md border p-3 ${a.isOwn ? 'bg-flare-500/5 border-flare-500/30' : 'bg-ink-900 border-ink-700'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-2xs font-mono text-ink-400 tabular-nums shrink-0">#{i + 1}</span>
+                <PlatformGlyph platform={a.platform} />
+                <span className={`truncate ${a.isOwn ? 'text-flare-400 font-medium' : 'text-ink-100'}`}>
+                  {a.competitorName || a.displayName || a.handle}
+                </span>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-sm font-medium text-ink-100 tabular-nums">
+                  {a.followers?.toLocaleString('en-US') ?? '—'}
+                </div>
+                <DeltaText delta={a.followersDelta} />
+              </div>
+            </div>
+            <div className="mt-2.5 flex items-center justify-between gap-3">
+              <span className="text-2xs text-ink-400">
+                {a.latestPost ? `${compact(a.latestPost.likes)} likes on last post` : 'no post data'}
+              </span>
+              <Sparkline points={a.history.map(h => h.followers)} width={72} height={18} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+    <div className="hidden lg:block rounded-md border border-ink-700 overflow-x-auto">
       <table className="w-full text-sm min-w-[640px]">
         <thead className="bg-ink-800 text-2xs uppercase tracking-wider text-ink-300">
           <tr>
@@ -249,6 +280,7 @@ function CompetitorTable({ rows, own }: { rows: AccountView[]; own: AccountView[
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -334,7 +366,7 @@ function RemoveButton({ id, onRemoved }: { id: string; onRemoved: () => void }) 
         onRemoved();
       }}
       aria-label="Stop tracking this channel"
-      className="text-2xs font-mono text-ink-500 hover:text-signal-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 rounded px-1 disabled:opacity-50"
+      className="text-2xs font-mono text-ink-500 hover:text-signal-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 rounded px-2 py-2 -my-1 disabled:opacity-50 shrink-0"
     >
       remove
     </button>

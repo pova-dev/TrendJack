@@ -49,7 +49,7 @@ export function IntelligencePanel({ initialBrief, aiAvailable, historyByAccount 
   const hasData = brief.rows.length > 0;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6 sm:space-y-7">
       <DailyBriefCard
         brief={brief}
         narrative={narrative}
@@ -61,7 +61,7 @@ export function IntelligencePanel({ initialBrief, aiAvailable, historyByAccount 
 
       {brief.opportunities.length > 0 && (
         <Section title="Opportunities" note={`${brief.opportunities.length} detected`}>
-          <div className="grid gap-2.5 lg:grid-cols-2">
+          <div className="grid gap-2.5 md:grid-cols-2">
             {brief.opportunities.map((o, i) => <OpportunityCard key={i} o={o} />)}
           </div>
         </Section>
@@ -99,7 +99,7 @@ function DailyBriefCard({
 
   return (
     <div className="rounded-lg border border-ink-700 bg-ink-900 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-ink-800 bg-ink-850">
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-ink-800 bg-ink-850">
         <div className="flex items-center gap-2.5">
           <span className="text-2xs font-mono uppercase tracking-wider text-flare-400">Today&rsquo;s brief</span>
           {narrative && (
@@ -120,19 +120,19 @@ function DailyBriefCard({
             type="button"
             onClick={onGenerate}
             disabled={loading}
-            className="h-7 px-2.5 rounded-md bg-flare-500 text-ink-950 text-2xs font-medium hover:bg-flare-400 disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-850"
+            className="h-8 sm:h-7 px-3 sm:px-2.5 rounded-md bg-flare-500 text-ink-950 text-2xs font-medium hover:bg-flare-400 disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-850"
           >
             {loading ? 'Analysing…' : narrative ? 'Refresh' : 'Write brief'}
           </button>
         )}
       </div>
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {loading && !narrative ? (
           <SkeletonLines />
         ) : (
           <>
-            <p className="text-[15px] leading-relaxed text-ink-100 max-w-[68ch]">{body}</p>
+            <p className="text-sm sm:text-[15px] leading-relaxed text-ink-100 max-w-[68ch]">{body}</p>
 
             {moves.length > 0 && (
               <ol className="mt-4 space-y-2">
@@ -215,6 +215,82 @@ function OpportunityCard({ o }: { o: Opportunity }) {
 function StandingsTable({
   rows, historyByAccount,
 }: { rows: RankRow[]; historyByAccount: Record<string, number[]> }) {
+  // Below lg the same rows render as cards. A 780px-wide table inside a
+  // horizontal scroller technically "works" on a phone, but it means swiping
+  // sideways to read a single channel, and the column you most want (the gap)
+  // is the one furthest off screen.
+  return (
+    <>
+      <div className="lg:hidden space-y-2">
+        {rows.map(r => (
+          <StandingsCard key={r.accountId} r={r} history={historyByAccount[r.accountId] ?? []} />
+        ))}
+      </div>
+      <div className="hidden lg:block">
+        <StandingsTableWide rows={rows} historyByAccount={historyByAccount} />
+      </div>
+      {rows.some(r => r.growth.perDay === null || r.engagementRatePct === null) && <DashLegend />}
+    </>
+  );
+}
+
+function StandingsCard({ r, history }: { r: RankRow; history: number[] }) {
+  return (
+    <div className={`rounded-md border border-ink-700 p-3.5 ${r.isOwn ? 'bg-flare-500/5 border-flare-500/30' : 'bg-ink-900'}`}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-2xs font-mono text-ink-400 tabular-nums shrink-0">#{r.rank}</span>
+          <PlatformGlyph platform={r.platform} />
+          <span className={`truncate ${r.isOwn ? 'text-flare-400 font-medium' : 'text-ink-100'}`}>{r.label}</span>
+          {r.isOwn && <span className="text-2xs font-mono text-flare-400/70 shrink-0">you</span>}
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-base font-semibold text-ink-100 tabular-nums leading-none">
+            {r.followers.toLocaleString('en-US')}
+          </div>
+          <div className="text-2xs font-mono text-ink-400 mt-1">{r.sharePct.toFixed(0)}% share</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <MiniStat label="Per day">
+          <Rate value={r.growth.perDay} />
+        </MiniStat>
+        <MiniStat label="Engagement">
+          {r.engagementRatePct === null ? <Dash /> : <span className="text-ink-100">{r.engagementRatePct.toFixed(2)}%</span>}
+        </MiniStat>
+        <MiniStat label="Gap above">
+          {r.gapToNext === null
+            ? <span className="text-2xs font-mono text-ink-500">leader</span>
+            : <span className="text-ink-100">{r.gapToNext.toLocaleString('en-US')}</span>}
+        </MiniStat>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-1.5 rounded-sm bg-ink-800 overflow-hidden">
+          <div
+            className={`h-full rounded-sm transition-[width] duration-500 ${r.isOwn ? 'bg-flare-500' : 'bg-ink-600'}`}
+            style={{ width: `${Math.max(2, r.sharePct)}%` }}
+          />
+        </div>
+        <Sparkline points={history} width={72} height={18} />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-2xs font-mono uppercase tracking-wider text-ink-400 mb-0.5">{label}</div>
+      <div className="text-sm tabular-nums">{children}</div>
+    </div>
+  );
+}
+
+function StandingsTableWide({
+  rows, historyByAccount,
+}: { rows: RankRow[]; historyByAccount: Record<string, number[]> }) {
   return (
     <div className="rounded-md border border-ink-700 overflow-x-auto">
       <table className="w-full text-sm min-w-[780px]">
@@ -294,8 +370,26 @@ function Rate({ value }: { value: number | null }) {
   );
 }
 
+/** A metric that has no value yet.
+ *
+ *  `title` is a mouse affordance and does nothing on touch, so the meaning is
+ *  carried by an accessible label and by a legend under each table rather than
+ *  hidden behind a hover. */
 function Dash() {
-  return <span className="text-ink-500" title="Not enough readings yet">—</span>;
+  return (
+    <span className="text-ink-500" aria-label="Not enough readings yet" title="Not enough readings yet">
+      —
+    </span>
+  );
+}
+
+/** Explains the em-dash without requiring a hover. */
+function DashLegend() {
+  return (
+    <p className="mt-2 text-2xs text-ink-500">
+      <span aria-hidden="true">—</span> means not enough readings yet, not zero.
+    </p>
+  );
 }
 
 /* ----------------------------------------------------------------- viral */
@@ -305,13 +399,13 @@ function ViralCard({ viral }: { viral: ViralAnalysis }) {
 
   return (
     <Section title="What is working" note={`${viral.sampleSize} posts analysed`}>
-      <div className="rounded-md border border-ink-700 bg-ink-900 p-5">
+      <div className="rounded-md border border-ink-700 bg-ink-900 p-4 sm:p-5">
         {!hasContent ? (
           <p className="text-sm text-ink-400">
             {viral.error ?? 'No patterns identified from the current sample.'}
           </p>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <h3 className="text-2xs font-mono uppercase tracking-wider text-flare-400 mb-2.5">Patterns</h3>
               <ul className="space-y-3">
