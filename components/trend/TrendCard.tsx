@@ -222,8 +222,12 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           </Chip>
         )}
       </p>
+      {/* The rationale is near-identical on most cards ("Opportunity 42. Watch
+          for spike or angle change."), so as a permanent line it was repeated
+          noise rather than information. It reveals with the rest of the card's
+          detail on hover, where it is actually being read. */}
       <p
-        className="text-2xs text-flare-400/80 line-clamp-1 mb-1.5 italic"
+        className="text-2xs text-flare-400/80 line-clamp-1 mb-1.5 italic max-h-0 overflow-hidden opacity-0 motion-safe:transition-all group-hover:max-h-6 group-hover:opacity-100 group-focus-within:max-h-6 group-focus-within:opacity-100"
         title={trend.recommendationReason}
       >
         ⤷ {trend.recommendationReason}
@@ -233,30 +237,46 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           row (above) so the row-4 layout is just metrics, evenly spaced.
           CVS only renders when meaningful (>0.04) to avoid clutter on
           legacy rows that haven't been re-scored. */}
-      <div className="flex items-center gap-1 mb-1.5">
+      {/* Five chips on every card meant none of them carried information: a
+          uniform row of numbers is wallpaper. Opportunity always shows, since
+          it is what the column sorts on. Risk and cringe show only when they
+          are actually worth knowing about, so their presence is itself the
+          signal. The diagnostic pair reveals on hover, same as the actions. */}
+      {/* No wrap, and the hover-only chips use `hidden` rather than opacity.
+          With flex-wrap plus opacity-0 the invisible chips still claimed
+          layout, so every card reserved a second 22px line that never showed
+          anything: measured at 42px tall for a row of one visible chip. */}
+      <div className="flex items-center gap-1 mb-1.5 overflow-hidden">
         <ScoreChip axis="opp" value={trend.scores.opportunity} />
-        {typeof trend.scores.jackingScore === 'number' && trend.scores.jackingScore > 0.04 && (
-          <ScoreChip axis="cvs" value={trend.scores.jackingScore} />
-        )}
-        <ScoreChip axis="fit" value={trend.scores.brandFit} />
-        <ScoreChip axis="risk" value={trend.scores.risk} invert />
-        <ScoreChip axis="cringe" value={trend.scores.cringe} invert />
-      </div>
+        {trend.scores.risk >= 0.4 && <ScoreChip axis="risk" value={trend.scores.risk} invert />}
+        {trend.scores.cringe >= 0.4 && <ScoreChip axis="cringe" value={trend.scores.cringe} invert />}
 
-      {/* row 5 — flags */}
-      {(trend.competitorClaimed || trend.formatFatigue > 0.7 || trend.scores.firstMover >= 0.6) && (
-        <div className="flex flex-wrap gap-1 mb-1.5">
-          {trend.competitorClaimed && (
-            <Chip tone="bad" title={`Claimed by ${trend.competitorClaimants.join(', ')}`}>
-              CLAIMED · {trend.competitorClaimants[0]}
-            </Chip>
-          )}
-          {trend.formatFatigue > 0.7 && <Chip tone="warn">FORMAT FATIGUE</Chip>}
+        {/* Rare, and therefore worth colour. */}
+        {trend.competitorClaimed && (
+          <Chip tone="bad" title={`Claimed by ${trend.competitorClaimants.join(', ')}`}>
+            CLAIMED · {trend.competitorClaimants[0]}
+          </Chip>
+        )}
+        {trend.formatFatigue > 0.7 && <Chip tone="warn">FATIGUED</Chip>}
+
+        <span className="hidden group-hover:flex group-focus-within:flex items-center gap-1 shrink-0">
           {trend.scores.firstMover >= 0.6 && !trend.competitorClaimed && (
             <Chip tone="flare">FIRST-MOVER</Chip>
           )}
-        </div>
-      )}
+          {typeof trend.scores.jackingScore === 'number' && trend.scores.jackingScore > 0.04 && (
+            <ScoreChip axis="cvs" value={trend.scores.jackingScore} />
+          )}
+          <ScoreChip axis="fit" value={trend.scores.brandFit} />
+          {trend.scores.risk < 0.4 && <ScoreChip axis="risk" value={trend.scores.risk} invert />}
+          {trend.scores.cringe < 0.4 && <ScoreChip axis="cringe" value={trend.scores.cringe} invert />}
+        </span>
+      </div>
+
+      {/* Flags used to occupy a row of their own on nearly every card, since
+          FIRST-MOVER fires on most of them. They are now inline with the score
+          chips above, which removes a whole line per card, and the two that
+          are genuinely rare (claimed, fatigued) keep their prominence by being
+          the only ones that ever appear in colour. */}
 
       {/* row 6 — actions.
        *  Mobile: always visible at full opacity, full-size buttons (Button
@@ -269,11 +289,18 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
        *    not inside the action row. tabIndex=-1 on the article (below)
        *    + keyboard arrow handlers in Board.tsx still work because the
        *    Board manages selection at its level, not via per-card focus. */}
-      <div className={cn(
-        'flex items-center gap-1 motion-safe:transition-opacity',
-        'sm:opacity-60 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
-      )}>
+      {/* Generate is the one action a card is usually there for, so it stays.
+          The rest revealed on hover: five text buttons on every card, times
+          200 cards, was a wall of repeated words that made the titles harder
+          to scan. Touch has no hover, so on small screens everything stays
+          visible — hiding actions behind a hover a phone cannot perform would
+          make them unreachable. */}
+      <div className="flex items-center gap-1">
         <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
+        <div className={cn(
+          'flex items-center gap-1 flex-1',
+          'sm:hidden sm:group-hover:flex sm:group-focus-within:flex',
+        )}>
         <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'save'); }}>Save</Button>
         <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="ghost"   onClick={e => { e.stopPropagation(); onAction(trend.id, 'pin'); }}>{trend.pinned ? 'Unpin' : 'Pin'}</Button>
         <a
@@ -290,6 +317,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         <Button size="xs" variant="ghost" className="ml-auto text-ink-400 hover:text-signal-red"
           aria-label={`Dismiss ${trend.title}`}
           onClick={e => { e.stopPropagation(); onAction(trend.id, 'dismiss'); }}>Dismiss</Button>
+        </div>
       </div>
     </article>
   );

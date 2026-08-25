@@ -53,11 +53,16 @@ const config: Config = {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      // Lifted one step across the board. The previous scale bottomed out at
+      // 10px and the board rendered 25,785 text nodes at that size, which is
+      // below any reasonable reading floor and the main reason the dashboards
+      // read as cluttered rather than dense. Line heights grow with it, since
+      // cramped leading was doing as much damage as the size.
       fontSize: {
-        '2xs': ['10px', { lineHeight: '14px' }],
-        xs: ['11px', { lineHeight: '16px' }],
-        sm: ['13px', { lineHeight: '18px' }],
-        base: ['14px', { lineHeight: '20px' }],
+        '2xs': ['11px', { lineHeight: '15px' }],
+        xs: ['12px', { lineHeight: '17px' }],
+        sm: ['13px', { lineHeight: '19px' }],
+        base: ['15px', { lineHeight: '22px' }],
       },
       boxShadow: {
         'col': '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4)',
