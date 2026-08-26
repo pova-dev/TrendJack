@@ -118,6 +118,60 @@ export function BoardColumn({
   }, [trends, showWindow, windowDays]);
 
   const sortedTrends = React.useMemo(() => sortTrends(windowedTrends, sortKey), [windowedTrends, sortKey]);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Incremental rendering.
+  //
+  // A column can hold 200 trends and a board shows eight of them, which is
+  // how the page reached ~52,000 DOM nodes. Only a screenful is rendered up
+  // front; more is appended as the operator scrolls.
+  //
+  // Deliberately append-only rather than a true virtual window. Cards that
+  // have been rendered stay rendered, which keeps three things working that
+  // a recycling window would break: browser find-in-page, the scroll
+  // position while new trends arrive above, and any card the operator has
+  // already interacted with.
+  //
+  // The keyboard hazard is the one that needed designing around. j/k walks
+  // every filtered trend via collectVisibleTrendIds in Board.tsx, not the
+  // rendered subset, so selection can land past the window. Rather than
+  // change that traversal (which would alter navigation behaviour), the
+  // window stretches to include whatever is selected. Navigating deep
+  // therefore degrades back to rendering everything, which is exactly the
+  // old behaviour, while the common case of opening the board and scrolling
+  // stays cheap.
+  // ─────────────────────────────────────────────────────────────────────
+  const PAGE_SIZE = 25;
+  const [renderCount, setRenderCount] = React.useState(PAGE_SIZE);
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Reset only when the operator changes what the column shows. Deliberately
+  // NOT keyed on the trend array, which changes identity on every poll: doing
+  // so would collapse the list under someone mid-scroll every 90 seconds.
+  React.useEffect(() => { setRenderCount(PAGE_SIZE); }, [column.id, sortKey, windowDays]);
+
+  const activeIdx = activeTrendId ? sortedTrends.findIndex(t => t.id === activeTrendId) : -1;
+  const renderLimit = Math.max(renderCount, activeIdx >= 0 ? activeIdx + 1 : 0);
+  const visibleTrends = React.useMemo(
+    () => sortedTrends.slice(0, renderLimit),
+    [sortedTrends, renderLimit],
+  );
+  const hasMore = renderLimit < sortedTrends.length;
+
+  React.useEffect(() => {
+    if (!hasMore) return;
+    const target = sentinelRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) setRenderCount(c => c + PAGE_SIZE); },
+      // Load the next page before the sentinel is actually on screen, so the
+      // list never visibly runs out underneath a fast scroll.
+      { root: scrollRef.current, rootMargin: '800px 0px' },
+    );
+    io.observe(target);
+    return () => io.disconnect();
+  }, [hasMore]);
   const tickLabel = lastTickAt
     ? `${Math.max(0, Math.floor((Date.now() - lastTickAt.getTime()) / 1000))}s`
     : '—';
@@ -277,7 +331,7 @@ export function BoardColumn({
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-ink-800/70">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto divide-y divide-ink-800/70">
         {sortedTrends.length === 0 && (
           <div className="px-6 py-12 text-center">
             <div className="w-8 h-8 mx-auto mb-3 rounded-full border border-dashed border-ink-600" aria-hidden="true" />
@@ -285,7 +339,7 @@ export function BoardColumn({
             <p className="mt-1 text-xs text-ink-500">This column&apos;s filters found no signals in the current window.</p>
           </div>
         )}
-        {sortedTrends.map(t => {
+        {visibleTrends.map(t => {
           const c = t as ClusteredTrend;
           return (
             <TrendCard
@@ -299,6 +353,17 @@ export function BoardColumn({
             />
           );
         })}
+
+        {/* Sentinel. Crossing into view (or within 800px of it) appends the
+            next page. Carries the remaining count so the state is legible
+            rather than an unexplained blank strip at the end of the list. */}
+        {hasMore && (
+          <div ref={sentinelRef} className="px-3.5 py-4 text-center" aria-hidden="true">
+            <span className="text-2xs font-mono text-ink-500 tabular-nums">
+              {sortedTrends.length - renderLimit} more
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );
