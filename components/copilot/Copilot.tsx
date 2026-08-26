@@ -59,16 +59,72 @@ export function Copilot() {
     }
   }
 
+  // Collapse while scrolling down, expand on scroll up or when idle. The pill
+  // is fixed, so it covers whatever passes beneath it; on a phone that was an
+  // entire card. Passive listeners and a rAF guard keep this off the scroll
+  // critical path.
+  const [collapsed, setCollapsed] = React.useState(false);
+  React.useEffect(() => {
+    let lastY = 0;
+    let ticking = false;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+
+    const read = (e: Event) => {
+      const t = e.target;
+      const y = t instanceof HTMLElement && t !== document.body
+        ? t.scrollTop
+        : window.scrollY;
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        // Ignore jitter; only a deliberate scroll should move it.
+        if (Math.abs(y - lastY) > 6) {
+          setCollapsed(y > lastY && y > 40);
+          lastY = y;
+        }
+        ticking = false;
+      });
+      clearTimeout(idle);
+      idle = setTimeout(() => setCollapsed(false), 1200);
+    };
+
+    // `true` captures scroll from inner containers, which is where this app
+    // actually scrolls; window scroll alone would never fire.
+    window.addEventListener('scroll', read, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('scroll', read, { capture: true } as EventListenerOptions);
+      clearTimeout(idle);
+    };
+  }, []);
+
   return (
     <>
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full bg-flare-500 text-ink-950 px-4 py-2.5 shadow-pop hover:bg-flare-400 font-semibold text-sm"
+          className={cn(
+            'fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full',
+            'bg-flare-500 text-ink-950 hover:bg-flare-400 font-semibold text-sm',
+            'motion-safe:transition-all duration-200',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950',
+            // A fixed pill sits on top of whatever scrolls under it. On a
+            // 390px screen that covered an entire card. Scrolling down now
+            // collapses it to a circular icon, which keeps it reachable while
+            // returning the width to the content. Scrolling back up, or
+            // hovering, restores the label.
+            collapsed
+              ? 'w-11 h-11 justify-center p-0 sm:w-auto sm:h-auto sm:px-4 sm:py-2.5'
+              : 'px-4 py-2.5 shadow-pop',
+          )}
           title="Open AI co-pilot · /"
+          aria-label="Open AI co-pilot"
         >
-          <span>✦</span> AI co-pilot
-          <kbd className="bg-ink-950/30 text-ink-100 px-1.5 py-0.5 rounded text-2xs font-mono">/</kbd>
+          <span aria-hidden="true">✦</span>
+          <span className={cn(collapsed && 'hidden sm:inline')}>AI co-pilot</span>
+          <kbd className={cn(
+            'bg-ink-950/30 text-ink-100 px-1.5 py-0.5 rounded text-2xs font-mono',
+            collapsed && 'hidden sm:inline',
+          )}>/</kbd>
         </button>
       )}
 

@@ -15,7 +15,10 @@ import { getOrgCredentials } from '@/lib/credentials';
 import { bus } from '@/lib/realtime/bus';
 import { providerReady, SocialProviderError, type SocialProvider, type SocialPlatform } from './types';
 import { youtubeApi } from './youtube';
-import { apifyInstagramProfile } from './apify';
+import {
+  apifyInstagramProfile, apifyFacebookPage,
+  apifyInstagramComments, apifyFacebookComments,
+} from './apify';
 import { metaInstagram, metaFacebook } from './meta';
 
 /** Default cadence. Matches the 15-minute decision in the build plan: fast
@@ -58,13 +61,52 @@ export function pickProvider(
     };
   }
 
+  // Own pages prefer Graph: free and exact. A pages actor closes the
+  // competitor gap, which the post-URL actor never could.
   if (isOwn && providerReady(metaFacebook, creds)) return { provider: metaFacebook };
+  if (providerReady(apifyFacebookPage, creds)) return { provider: apifyFacebookPage };
 
   return {
     provider: null,
     reason: isOwn
       ? 'Add META_ACCESS_TOKEN to track your own Facebook Page. It is free and exact.'
-      : 'No configured source reports Facebook page followers. The Facebook actor reads posts by URL only.',
+      : 'Competitor Facebook needs a pages actor. Set APIFY_ACTOR_FACEBOOK_PAGE (e.g. apify/facebook-pages-scraper); the configured post actor reads post URLs only and reports no follower count.',
+  };
+}
+
+/**
+ * Which provider can read comment TEXT for a post.
+ *
+ * Separate from pickProvider because the capability is separate: several
+ * providers report a comment COUNT but no bodies. Returning null with a reason
+ * lets the UI hide the action instead of offering a button that can only fail.
+ */
+export function pickCommentProvider(
+  platform: SocialPlatform,
+  isOwn: boolean,
+  creds: Record<string, string>,
+): { provider: SocialProvider } | { provider: null; reason: string } {
+  // YouTube ships comment text with the free API, so it never needs an actor.
+  if (platform === 'youtube') {
+    return providerReady(youtubeApi, creds)
+      ? { provider: youtubeApi }
+      : { provider: null, reason: 'Add YOUTUBE_API_KEY to read YouTube comments. It is free.' };
+  }
+
+  if (platform === 'instagram') {
+    if (isOwn && providerReady(metaInstagram, creds)) return { provider: metaInstagram };
+    if (providerReady(apifyInstagramComments, creds)) return { provider: apifyInstagramComments };
+    return {
+      provider: null,
+      reason: 'Instagram comment text needs a comments actor. Set APIFY_ACTOR_INSTAGRAM_COMMENTS (e.g. apify/instagram-comment-scraper); the profile actor returns counts only.',
+    };
+  }
+
+  if (isOwn && providerReady(metaFacebook, creds)) return { provider: metaFacebook };
+  if (providerReady(apifyFacebookComments, creds)) return { provider: apifyFacebookComments };
+  return {
+    provider: null,
+    reason: 'Facebook comment text needs a comments actor. Set APIFY_ACTOR_FACEBOOK_COMMENTS; the configured post actor returns counts only.',
   };
 }
 

@@ -9,6 +9,7 @@ import { startPlanLifecycleCron } from '@/lib/plan-cron';
 import { bootMediaAdapters } from '@/src/core/media/boot';
 import { startSocialPollCron } from '@/lib/social/poller';
 import { startRetentionCron } from '@/lib/retention';
+import { initRealtime } from '@/lib/realtime/bus';
 
 // Boot the background ingest cron + agentic pipeline + lineage cron +
 // media adapters once per Node process. All are idempotent via
@@ -30,6 +31,9 @@ startPlanLifecycleCron();
 bootMediaAdapters();
 startSocialPollCron();
 startRetentionCron();
+// Fans realtime events across instances when REDIS_URL is set, and warns
+// loudly when it is not on a platform that runs more than one.
+void initRealtime();
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();

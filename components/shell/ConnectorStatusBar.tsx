@@ -20,20 +20,32 @@ interface ConnectorStatus {
 }
 
 export function ConnectorStatusBar({ statuses }: { statuses: ConnectorStatus[] }) {
+  // A strip listing all nine sources with LIVE beside each spent twenty words
+  // saying "everything is fine". Healthy sources collapse to a single count;
+  // only the ones that need attention are named, so the strip is worth a
+  // glance instead of being tuned out.
+  const live = statuses.filter(s => s.ok && s.mode !== 'mock');
+  const degraded = statuses.filter(s => !s.ok || s.mode === 'mock');
+
   return (
-    <footer className="flex flex-wrap items-center gap-3 min-h-7 px-4 border-t border-ink-700 bg-ink-950 text-2xs font-mono text-ink-400">
-      <span className="uppercase tracking-widest">connectors</span>
-      {statuses.map(s => (
-        <span key={s.id ?? s.source} className="flex items-center gap-1">
-          <span className={cn(
-            'w-1.5 h-1.5 rounded-full',
-            s.ok ? (s.mode === 'mock' ? 'bg-signal-amber' : 'bg-signal-green') : 'bg-signal-red',
-          )} />
+    <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 min-h-7 py-1 px-4 border-t border-ink-700 bg-ink-950 text-2xs text-ink-400">
+      <span className="flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-signal-green" />
+        <span className="font-mono tabular-nums text-ink-200">{live.length}</span>
+        <span>live</span>
+      </span>
+
+      {degraded.map(s => (
+        <span key={s.id ?? s.source} className="flex items-center gap-1.5" title={s.ok ? 'Using bundled fixtures' : 'Source unavailable'}>
+          <span className={cn('w-1.5 h-1.5 rounded-full', s.ok ? 'bg-signal-amber' : 'bg-signal-red')} />
           <span className="text-ink-300">{s.label ?? sourceLabel(s.source)}</span>
-          <span className="uppercase text-ink-500">{s.mode}</span>
+          <span className={cn('font-mono', s.ok ? 'text-signal-amber' : 'text-signal-red')}>
+            {s.ok ? 'mock' : 'down'}
+          </span>
         </span>
       ))}
-      <span className="ml-auto">⟳ tiered: 60s · 5m · 15m · 60m</span>
+
+      <span className="ml-auto font-mono text-ink-500">60s · 5m · 15m · 60m</span>
     </footer>
   );
 }

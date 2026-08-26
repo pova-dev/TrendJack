@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { realtimeStatus } from '@/lib/realtime/bus';
 import { getCronStatus } from '@/lib/cron';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1`;
     const cron = getCronStatus();
     return NextResponse.json({
-      ok: true,
+      ok: true, realtime: realtimeStatus(),
       uptimeSec: Math.round(process.uptime()),
       dbLatencyMs: Date.now() - t0,
       cron: {

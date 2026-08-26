@@ -9,7 +9,7 @@
 // pollable would produce a poll that can only fail.
 
 import { describe, expect, it } from 'vitest';
-import { pickProvider, findDueAccounts } from '@/lib/social/poller';
+import { pickProvider, pickCommentProvider, findDueAccounts } from '@/lib/social/poller';
 
 const FULL = {
   YOUTUBE_API_KEY: 'yt',
@@ -69,6 +69,48 @@ describe('pickProvider', () => {
     expect(ig.provider).toBeNull();
     // Token alone is not enough; the actor id is required too.
     expect('reason' in ig && ig.reason).toMatch(/APIFY_ACTOR_INSTAGRAM_PROFILE/);
+  });
+});
+
+describe('closing the two source gaps', () => {
+  // Neither capability had ANY source in the originally configured actor set,
+  // so both were dead ends. They now activate the moment an actor id is set.
+
+  it('reads competitor Facebook followers once a pages actor is configured', () => {
+    const withPage = { ...FULL, APIFY_ACTOR_FACEBOOK_PAGE: 'apify/facebook-pages-scraper' };
+    expect(pickProvider('facebook', false, withPage).provider?.id).toBe('apify:facebook-page');
+  });
+
+  it('still refuses competitor Facebook without one, and says which actor fixes it', () => {
+    const r = pickProvider('facebook', false, FULL);
+    expect(r.provider).toBeNull();
+    expect('reason' in r && r.reason).toMatch(/APIFY_ACTOR_FACEBOOK_PAGE/);
+  });
+
+  it('reads Instagram comment text once a comments actor is configured', () => {
+    const withComments = { ...FULL, APIFY_ACTOR_INSTAGRAM_COMMENTS: 'apify/instagram-comment-scraper' };
+    expect(pickCommentProvider('instagram', false, withComments).provider?.id)
+      .toBe('apify:instagram-comments');
+  });
+
+  it('names the actor that would fix missing Instagram comments', () => {
+    const r = pickCommentProvider('instagram', false, FULL);
+    expect(r.provider).toBeNull();
+    expect('reason' in r && r.reason).toMatch(/APIFY_ACTOR_INSTAGRAM_COMMENTS/);
+    // Explains WHY the configured actor is insufficient rather than just
+    // reporting an absence.
+    expect('reason' in r && r.reason).toMatch(/counts only/i);
+  });
+
+  it('never pays an actor for YouTube comments, which the free API returns', () => {
+    expect(pickCommentProvider('youtube', false, FULL).provider?.id).toBe('youtube-api');
+  });
+
+  it('prefers Graph for our own comments, since it is free and exact', () => {
+    const withMeta = { ...FULL, META_ACCESS_TOKEN: 'm', APIFY_ACTOR_INSTAGRAM_COMMENTS: 'a/b' };
+    expect(pickCommentProvider('instagram', true, withMeta).provider?.id).toBe('meta-graph:instagram');
+    // A competitor cannot be read through Graph, so it falls to the actor.
+    expect(pickCommentProvider('instagram', false, withMeta).provider?.id).toBe('apify:instagram-comments');
   });
 });
 

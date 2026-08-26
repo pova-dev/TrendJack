@@ -26,6 +26,9 @@ const SOCIAL_KEY_SPECS: { key: string; helper?: string; secret?: boolean }[] = [
   { key: 'APIFY_ACTOR_FACEBOOK_POST', secret: false, helper: 'Post URL → likes / views / comment count. e.g. clappi/facebook-posts-reels-scraper' },
   { key: 'APIFY_ACTOR_YOUTUBE_VIDEO', secret: false, helper: 'Optional. The free YouTube API returns more than this actor does.' },
   { key: 'META_ACCESS_TOKEN', helper: 'Long-lived Page token with pages_read_engagement + instagram_basic. Free and exact, for accounts you own.' },
+  { key: 'APIFY_ACTOR_FACEBOOK_PAGE', secret: false, helper: 'Closes the competitor Facebook gap: handle → page followers. e.g. apify/facebook-pages-scraper' },
+  { key: 'APIFY_ACTOR_INSTAGRAM_COMMENTS', secret: false, helper: 'Closes the Instagram comment-text gap. e.g. apify/instagram-comment-scraper' },
+  { key: 'APIFY_ACTOR_FACEBOOK_COMMENTS', secret: false, helper: 'Facebook comment text. Not needed for pages you own; Meta returns it free.' },
 ];
 
 const KEY_SPECS: Record<string, { key: string; helper?: string; secret?: boolean }[]> = {

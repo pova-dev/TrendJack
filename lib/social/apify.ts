@@ -323,6 +323,103 @@ export const apifyYoutubeVideo = makePostMetricsProvider('youtube', {
   input: url => ({ videoUrls: [url] }),
 });
 
+/**
+ * Comment text for one post.
+ *
+ * None of the four originally configured actors returns comment bodies, only
+ * counts, so this capability had no source at all. Rather than leave that a
+ * dead end, the provider exists and activates the moment an actor id is set:
+ * `apify/instagram-comment-scraper` and equivalents are drop-in.
+ *
+ * Written against the field names those actors actually emit, and the mapper
+ * already accepts the common spellings, so a different comment actor should
+ * need no code change.
+ */
+function makeCommentProvider(
+  platform: 'instagram' | 'facebook',
+  cfg: { id: string; actorKey: string; input: (url: string, limit: number) => unknown },
+): SocialProvider {
+  return {
+    id: cfg.id,
+    platform,
+    supportsOwn: true,
+    supportsCompetitor: true,
+    requires: ['APIFY_TOKEN', cfg.actorKey],
+
+    async fetchProfile(handle: string): Promise<ProfileResult> {
+      throw new SocialProviderError(
+        `${cfg.id} reads comments for a post URL and cannot resolve "${handle}" or any follower count`,
+        'apify',
+      );
+    },
+
+    async fetchComments(post, ctx, limit): Promise<CommentSnapshot[]> {
+      if (!post.permalink) {
+        throw new SocialProviderError('This post has no public URL, so its comments cannot be read', 'apify');
+      }
+      const rows = await runActor<Row>(
+        ctx.credentials[cfg.actorKey], cfg.input(post.permalink, limit),
+        ctx.credentials.APIFY_TOKEN, { maxItems: limit },
+      );
+      return rows.map(mapComment).filter(c => c.text.trim() !== '').slice(0, limit);
+    },
+  };
+}
+
+export const apifyInstagramComments = makeCommentProvider('instagram', {
+  id: 'apify:instagram-comments',
+  actorKey: 'APIFY_ACTOR_INSTAGRAM_COMMENTS',
+  input: (url, limit) => ({ directUrls: [url], resultsLimit: limit }),
+});
+
+export const apifyFacebookComments = makeCommentProvider('facebook', {
+  id: 'apify:facebook-comments',
+  actorKey: 'APIFY_ACTOR_FACEBOOK_COMMENTS',
+  input: (url, limit) => ({ startUrls: [{ url }], resultsLimit: limit }),
+});
+
+/**
+ * Facebook PAGE, addressed by handle.
+ *
+ * The configured Facebook actor reads posts by URL and reports no page
+ * follower count, which is why competitor Facebook had no source. A pages
+ * actor (`apify/facebook-pages-scraper` and equivalents) closes that, and the
+ * profile mapper already reads fanCount / followers / likes, so it drops in.
+ */
+export const apifyFacebookPage: SocialProvider = {
+  id: 'apify:facebook-page',
+  platform: 'facebook',
+  supportsOwn: true,
+  supportsCompetitor: true,
+  requires: ['APIFY_TOKEN', 'APIFY_ACTOR_FACEBOOK_PAGE'],
+
+  async fetchProfile(handle: string, ctx: SocialProviderContext): Promise<ProfileResult> {
+    const rows = await runActor<Row>(
+      ctx.credentials.APIFY_ACTOR_FACEBOOK_PAGE,
+      { startUrls: [{ url: handleToFacebookUrl(handle) }], resultsLimit: 1 },
+      ctx.credentials.APIFY_TOKEN,
+      { maxItems: 1 },
+    );
+    const row = rows[0];
+    if (!row) throw new SocialProviderError(`Apify returned no data for "${handle}"`, 'apify', true);
+    assertNotErrorRow(row, handle);
+
+    const profile = mapProfile(row, handle);
+    // A page whose follower count the actor could not read must not be
+    // recorded as zero; that renders as a total collapse on the chart.
+    if (!profile.followers) {
+      throw new SocialProviderError(
+        `The Facebook actor returned no follower count for "${handle}". Check the actor exposes fanCount or followers.`,
+        'apify',
+      );
+    }
+
+    const embedded = (row.posts ?? row.latestPosts ?? row.topPosts) as Row[] | undefined;
+    const latestPost = Array.isArray(embedded) && embedded.length ? mapPost(embedded[0]) : undefined;
+    return { profile, latestPost: latestPost?.externalId ? latestPost : undefined };
+  },
+};
+
 /** Accept either a bare page slug or a full URL. */
 export function handleToFacebookUrl(handle: string): string {
   if (/^https?:\/\//i.test(handle)) return handle;
