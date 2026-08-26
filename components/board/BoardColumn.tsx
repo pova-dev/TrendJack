@@ -129,7 +129,9 @@ export function BoardColumn({
         //   (60px) and a small breathing margin (8px = 4px each side
         //   from mx-1). On a 390px iPhone this gives a 322px column.
         // Desktop (≥sm): fixed 360px so multiple columns fit on screen.
-        'flex flex-col flex-shrink-0 w-[calc(100vw-72px)] sm:w-[360px] h-[calc(100%-12px)] my-1.5 mx-1 rounded-xl bg-ink-850 border border-ink-700/60 shadow-col overflow-hidden transition-opacity',
+        'flex flex-col flex-shrink-0 w-[calc(100vw-72px)] sm:w-[360px] h-[calc(100%-12px)] my-1.5 mx-1',
+        'rounded-lg bg-ink-900 border border-ink-700/70 overflow-hidden',
+        'transition-[opacity,border-color] duration-150 hover:border-ink-600',
         dragging && 'opacity-40 ring-1 ring-flare-500',
       )}
       aria-label={column.title}
@@ -145,18 +147,36 @@ export function BoardColumn({
           onDragStart?.();
         }}
         onDragEnd={onDragEnd}
-        className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2.5 border-b border-ink-700 bg-ink-850/95 backdrop-blur relative cursor-grab active:cursor-grabbing select-none rounded-t-xl"
+        className="group/hdr sticky top-0 z-10 flex items-center gap-2.5 px-3.5 py-3 border-b border-ink-700/70 bg-ink-850/90 backdrop-blur-sm relative cursor-grab active:cursor-grabbing select-none"
         title="Drag column header to reorder"
       >
-        <span className="text-flare-400 font-mono text-sm select-none" title="Drag to reorder">⠿</span>
-        <span className="text-ink-300 font-mono text-xs">{COLUMN_ICONS[column.type] ?? '·'}</span>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-100 truncate">{column.title}</h2>
         <span
-          className="text-2xs font-mono text-ink-400 tabular-nums ml-auto bg-ink-800 rounded px-1.5 py-0.5"
+          aria-hidden="true"
+          className="w-[3px] h-4 rounded-full bg-flare-500/70 shrink-0 transition-colors group-hover/hdr:bg-flare-500"
+        />
+        <span className="text-ink-400 font-mono text-xs shrink-0">{COLUMN_ICONS[column.type] ?? '·'}</span>
+        <h2 className="text-sm font-semibold text-ink-100 truncate tracking-[-0.01em]">{column.title}</h2>
+        <span
+          className="text-xs font-mono text-ink-400 tabular-nums shrink-0"
           title={`${windowedTrends.length} trends in this column`}
         >
           {windowedTrends.length}
         </span>
+        {/* Controls are used rarely; keeping six of them permanently visible at
+            the same weight as the title is what made the header read as a
+            toolbar rather than a label. They reveal on hover, and stay put on
+            touch where there is no hover to perform. */}
+        <span
+          className={cn(
+            'ml-auto flex items-center gap-1.5 shrink-0 motion-safe:transition-opacity duration-150',
+            // An open dropdown pins the controls visible. Without this,
+            // moving the pointer down onto the menu leaves the header, the
+            // reveal fades, and the menu vanishes mid-click.
+            (windowOpen || sortOpen || menuOpen)
+              ? 'opacity-100'
+              : 'sm:opacity-0 sm:group-hover/hdr:opacity-100 sm:focus-within:opacity-100',
+          )}
+        >
         {/* Brand Matches: window selector (Today/7d/15d/30d). Operator
             picks the look-back lens — reactive (today) vs retrospective
             (30d). Per-column, persisted to localStorage. */}
@@ -242,6 +262,7 @@ export function BoardColumn({
             className="text-ink-400 hover:text-ink-100 px-1"
           >⋯</button>
         )}
+        </span>
         {menuOpen && (
           <div className="absolute right-2 top-9 z-20 w-36 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-1">
             {onEditColumn && (
@@ -256,9 +277,13 @@ export function BoardColumn({
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-ink-700/40">
+      <div className="flex-1 overflow-y-auto divide-y divide-ink-800/70">
         {sortedTrends.length === 0 && (
-          <div className="px-3 py-6 text-center text-2xs text-ink-400 font-mono">no signals match this column&apos;s filters</div>
+          <div className="px-6 py-12 text-center">
+            <div className="w-8 h-8 mx-auto mb-3 rounded-full border border-dashed border-ink-600" aria-hidden="true" />
+            <p className="text-sm text-ink-300">Nothing matches yet</p>
+            <p className="mt-1 text-xs text-ink-500">This column&apos;s filters found no signals in the current window.</p>
+          </div>
         )}
         {sortedTrends.map(t => {
           const c = t as ClusteredTrend;

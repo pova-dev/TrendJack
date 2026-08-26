@@ -75,11 +75,15 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
         if (e.key === 'o') { e.preventDefault(); window.open(resolveSourceUrl(trend), '_blank'); }
       }}
       className={cn(
-        'group relative cursor-pointer border-l-2 px-3 py-2 transition-colors',
+        'group relative cursor-pointer border-l-[3px] px-3.5 py-2.5',
         'card-skip',
-        'hover:bg-ink-800/60 focus-visible:bg-ink-800/60 focus:outline-none',
-        active ? 'bg-ink-800' : 'bg-ink-900',
-        isHero ? 'border-flare-500' : 'border-transparent',
+        'motion-safe:transition-[background-color,border-color] duration-100',
+        'hover:bg-ink-800/50 focus-visible:bg-ink-800/50 focus:outline-none',
+        // Selection reads as primary, not as a slightly different grey.
+        active ? 'bg-ink-800 border-flare-400' : 'bg-ink-900',
+        // POST_NOW keeps its rail when unselected.
+        !active && (isHero ? 'border-flare-500/80' : 'border-transparent'),
+        !active && 'hover:border-ink-600',
         trend.pinned && 'bg-flare-500/[0.04]',
         // Three visual tiers:
         //   1. Decaying (past 70% of peak life): heavy fade + grayscale.
@@ -295,7 +299,15 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           visible — hiding actions behind a hover a phone cannot perform would
           make them unreachable. */}
       <div className="flex items-center gap-1">
-        <Button size="sm" className="sm:!h-6 sm:!px-2 sm:!text-2xs" variant="primary" onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}>Generate</Button>
+        <Button
+          size="sm"
+          className={cn(
+            'sm:!h-6 sm:!px-2 sm:!text-2xs',
+            !isHero && 'sm:!bg-ink-800 sm:!text-ink-200 sm:group-hover:!bg-flare-500 sm:group-hover:!text-ink-950',
+          )}
+          variant="primary"
+          onClick={e => { e.stopPropagation(); onAction(trend.id, 'generate'); }}
+        >Generate</Button>
         <div className={cn(
           'flex items-center gap-1 flex-1',
           'sm:hidden sm:group-hover:flex sm:group-focus-within:flex',

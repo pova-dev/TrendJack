@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { BrandSwitcher } from './BrandSwitcher';
@@ -36,9 +37,21 @@ export function TopBar({ brand, brands, trendCount, postNowCount, liveAt, onAddC
 
       <div className="hidden md:block h-5 w-px bg-ink-700 mx-1" />
 
-      <div className="hidden md:flex items-center gap-3 text-2xs font-mono text-ink-300">
-        <span>signals <span className="text-ink-100 tabular-nums">{trendCount}</span></span>
-        <span>post-now <span className="text-flare-400 tabular-nums">{postNowCount}</span></span>
+      {/* A metric pair rather than two loose fragments: the figure carries the
+          weight and the label recedes, which is the difference between a
+          readout and a status string. */}
+      <div className="hidden md:flex items-center gap-5">
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-sm font-mono tabular-nums text-ink-100 leading-none">{trendCount}</span>
+          <span className="text-2xs text-ink-400">signals</span>
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className={cn(
+            'text-sm font-mono tabular-nums leading-none',
+            postNowCount > 0 ? 'text-flare-400' : 'text-ink-400',
+          )}>{postNowCount}</span>
+          <span className="text-2xs text-ink-400">post now</span>
+        </span>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
