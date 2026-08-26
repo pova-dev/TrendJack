@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { resolveSourceUrl } from '@/lib/source-link';
 import { displayLineage } from '@/lib/lineage-display';
+import { useNow } from '@/lib/hooks/use-now';
 
 interface Props {
   trend: Trend;
@@ -44,15 +45,12 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
   // The placeholder phase only lasts a single paint frame, so the user
   // never visually sees the dash in practice.
   // ─────────────────────────────────────────────────────────────────────
-  const [now, setNow] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    setNow(Date.now());
-    // Refresh every minute so the countdown stays roughly accurate without
-    // re-rendering on every keystroke. Operators don't need second-level
-    // precision on a 16-hour countdown.
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, []);
+  // One clock shared by every card, rather than a timer per card. See
+  // lib/hooks/use-now.ts: several hundred independent intervals meant a
+  // continuous trickle of renders instead of one batched pass a minute.
+  // The null-until-mounted contract is unchanged, so the placeholder
+  // behaviour below still holds.
+  const now = useNow();
 
   const peak = now != null ? timeUntil(trend.peakWindowEnd) : '—';
   const isHero = trend.recommendation === 'POST_NOW';
@@ -78,6 +76,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
       }}
       className={cn(
         'group relative cursor-pointer border-l-2 px-3 py-2 transition-colors',
+        'card-skip',
         'hover:bg-ink-800/60 focus-visible:bg-ink-800/60 focus:outline-none',
         active ? 'bg-ink-800' : 'bg-ink-900',
         isHero ? 'border-flare-500' : 'border-transparent',

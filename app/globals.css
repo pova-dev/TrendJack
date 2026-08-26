@@ -138,3 +138,26 @@ html.light .shadow-pop {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Off-screen card skipping.
+
+   A board with eight columns renders ~52,000 DOM nodes, and scrolling dropped
+   frames because the browser laid out and painted every card whether or not it
+   was visible: p95 frame time 26.6ms against a 16.7ms budget.
+
+   `content-visibility: auto` lets the browser skip layout and paint for
+   anything outside the viewport while keeping the element in the DOM, so
+   keyboard navigation, find-in-page, the cross-column dedup and every existing
+   handler behave exactly as before. This is the reason to prefer it over
+   virtualisation, which would have removed nodes and broken all four.
+
+   `contain-intrinsic-size` supplies a placeholder height so the scrollbar does
+   not jump as cards enter and leave. 116px is the measured height of a card in
+   its collapsed (non-hovered) state.
+   ────────────────────────────────────────────────────────────────────────── */
+.card-skip {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 116px;
+}
