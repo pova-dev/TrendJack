@@ -12,6 +12,22 @@ import { TestButton } from '@/components/connectors/TestButton';
 
 // Per-source credential metadata. Drives the inline editors so the user
 // can type / paste a key right next to the connector option that needs it.
+/** Social analytics credentials.
+ *
+ *  These belong to no entry in the connector registry, so the per-source loop
+ *  below never renders them and they were unreachable from the UI: the API
+ *  accepted them, but nothing offered a field. Given their own section so an
+ *  operator can add a token without touching a file or redeploying. */
+const SOCIAL_KEY_SPECS: { key: string; helper?: string; secret?: boolean }[] = [
+  { key: 'YOUTUBE_API_KEY', helper: 'Free. Google Cloud → APIs → YouTube Data v3. Covers your channel AND every competitor, including comment text. Start here.' },
+  { key: 'APIFY_TOKEN', helper: 'apify.com → Settings → Integrations. Needed only for competitor Instagram; billed per result.' },
+  { key: 'APIFY_ACTOR_INSTAGRAM_PROFILE', secret: false, helper: 'Handle → followers + recent posts. e.g. apify/instagram-profile-scraper' },
+  { key: 'APIFY_ACTOR_INSTAGRAM_POST', secret: false, helper: 'Post URL → deep engagement. e.g. patient_discovery/instagram-reel-analytics-by-url' },
+  { key: 'APIFY_ACTOR_FACEBOOK_POST', secret: false, helper: 'Post URL → likes / views / comment count. e.g. clappi/facebook-posts-reels-scraper' },
+  { key: 'APIFY_ACTOR_YOUTUBE_VIDEO', secret: false, helper: 'Optional. The free YouTube API returns more than this actor does.' },
+  { key: 'META_ACCESS_TOKEN', helper: 'Long-lived Page token with pages_read_engagement + instagram_basic. Free and exact, for accounts you own.' },
+];
+
 const KEY_SPECS: Record<string, { key: string; helper?: string; secret?: boolean }[]> = {
   X_BEARER_TOKEN:    [{ key: 'X_BEARER_TOKEN', helper: 'X / Twitter v2 Bearer token. Basic tier $200/mo.' }],
   YOUTUBE_API_KEY:   [{ key: 'YOUTUBE_API_KEY', helper: 'Google Cloud → APIs → YouTube Data v3. 10k unit free quota/day.' }],
@@ -58,6 +74,29 @@ export default async function ConnectorsPage() {
             <Link href="/settings/ai" className="ml-auto text-flare-400 hover:underline">Need to add an AI key? →</Link>
           </div>
         </header>
+
+        <section className="rounded-md border border-ink-700 bg-ink-900 overflow-hidden">
+          <header className="flex items-center gap-3 px-4 py-2.5 bg-ink-800/40 border-b border-ink-700">
+            <span className="text-sm font-semibold text-ink-100">Social analytics</span>
+            <span className="text-2xs text-ink-400">powers the Social tab</span>
+            <span className="ml-auto flex items-center gap-2 text-2xs font-mono">
+              <span className={has('YOUTUBE_API_KEY') ? 'text-signal-green' : 'text-ink-400'}>YouTube</span>
+              <span className={has('APIFY_TOKEN') ? 'text-signal-green' : 'text-ink-400'}>Apify</span>
+              <span className={has('META_ACCESS_TOKEN') ? 'text-signal-green' : 'text-ink-400'}>Meta</span>
+            </span>
+          </header>
+          <div className="px-4 py-3 space-y-2">
+            <p className="text-2xs text-ink-400">
+              A YouTube key alone tracks every channel on your list, competitors included, and costs nothing.
+              Apify is only required for competitor Instagram. Meta is only for accounts you own.
+            </p>
+            <CredentialEditor
+              title="social keys"
+              keys={SOCIAL_KEY_SPECS}
+              initial={credList.map(c => ({ key: c.key, mask: c.mask }))}
+            />
+          </div>
+        </section>
 
         {overview.map(o => {
           // For this source, gather the env-key sets across all of its options.
