@@ -91,7 +91,7 @@ export default async function ConnectorsPage() {
               Apify is only required for competitor Instagram. Meta is only for accounts you own.
             </p>
             <CredentialEditor
-              title="social keys"
+              title=""
               keys={SOCIAL_KEY_SPECS}
               initial={credList.map(c => ({ key: c.key, mask: c.mask }))}
             />

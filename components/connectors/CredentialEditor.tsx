@@ -70,8 +70,8 @@ export function CredentialEditor({ title, subtitle, keys, initial, rightSlot }: 
           const set = isSet(spec.key);
           return (
             <div key={spec.key} className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-2xs font-mono uppercase tracking-wider text-ink-300 w-44 shrink-0 flex items-center gap-1">
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                <span className="text-2xs font-mono uppercase tracking-wider text-ink-300 sm:w-56 sm:shrink-0 flex items-center gap-1 break-all">
                   {spec.key}
                   {set && <Chip tone="good" className="!text-[9px]">set</Chip>}
                 </span>
