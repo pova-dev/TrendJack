@@ -102,7 +102,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
       )}
     >
       {trend.pinned && (
-        <span className="absolute right-1 top-1 text-flare-400 text-2xs font-mono">📌</span>
+        <span className="absolute right-1 top-1 text-flare-400 text-2xs font-mono">◆</span>
       )}
 
       {/* LEGACY chip: trends > 7 days old in a 15/30-day window get a

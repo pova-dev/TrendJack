@@ -169,7 +169,7 @@ export function BoardColumn({
               className="flex items-center gap-1 text-2xs font-mono text-ink-300 hover:text-ink-100 hover:bg-ink-800 px-1.5 py-0.5 rounded border border-ink-700/60"
               title={`Window: ${WINDOW_LABELS[windowDays]} — click to change`}
             >
-              <span className="text-ink-500">📅</span>
+              <span className="text-ink-500">◷</span>
               <span>{WINDOW_LABELS[windowDays]}</span>
             </button>
             {windowOpen && (

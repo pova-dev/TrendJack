@@ -64,6 +64,16 @@ const config: Config = {
         sm: ['13px', { lineHeight: '19px' }],
         base: ['15px', { lineHeight: '22px' }],
       },
+      // Radius scale tightened one notch. The default 8/12px reads as a
+      // consumer app; 3-6px reads as an instrument, which is what this is.
+      borderRadius: {
+        sm: '2px',
+        DEFAULT: '3px',
+        md: '4px',
+        lg: '5px',
+        xl: '6px',
+        '2xl': '8px',
+      },
       boxShadow: {
         'col': '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4)',
         'pop': '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)',

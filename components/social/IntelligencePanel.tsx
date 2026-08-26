@@ -67,7 +67,7 @@ export function IntelligencePanel({ initialBrief, aiAvailable, historyByAccount 
 
       {brief.opportunities.length > 0 && (
         <Block title="What to act on">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid border border-ink-700 divide-y divide-ink-800 md:grid-cols-3 md:divide-y-0 md:divide-x">
             {brief.opportunities.slice(0, 3).map((o, i) => <OpportunityCard key={i} o={o} />)}
           </div>
         </Block>
@@ -101,7 +101,7 @@ function HeadlineStats({ brief }: { brief: DailyBrief }) {
   const own = brief.rows.filter(r => r.isOwn);
 
   return (
-    <div className="grid grid-cols-2 gap-px bg-ink-700 rounded-xl overflow-hidden border border-ink-700 lg:grid-cols-4">
+    <div className="grid grid-cols-2 border-y border-ink-700 divide-x divide-y divide-ink-800 lg:grid-cols-4 lg:divide-y-0">
       <Stat
         value={f.ownFollowersTotal === null ? '—' : f.ownFollowersTotal.toLocaleString('en-US')}
         label="Total followers"
@@ -142,12 +142,12 @@ function Stat({ value, label, sub, tone }: {
     : 'text-ink-300';
 
   return (
-    <div className="bg-ink-900 px-4 py-4 sm:px-5 sm:py-5">
-      <div className={`text-[22px] sm:text-[28px] lg:text-[32px] font-semibold tabular-nums leading-none tracking-tight ${valueTone}`}>
+    <div className="px-4 py-4 sm:px-5 sm:py-5">
+      <div className={`font-mono text-[22px] sm:text-[26px] lg:text-[30px] font-medium tabular-nums leading-none tracking-tight ${valueTone}`}>
         {value}
       </div>
-      <div className="mt-2.5 text-[13px] sm:text-sm font-medium text-ink-200">{label}</div>
-      <div className={`mt-1 text-xs sm:text-[13px] ${subTone}`}>{sub}</div>
+      <div className="mt-3 text-2xs font-mono uppercase tracking-[0.12em] text-ink-400">{label}</div>
+      <div className={`mt-1.5 text-[13px] tabular-nums ${subTone}`}>{sub}</div>
     </div>
   );
 }
@@ -245,7 +245,7 @@ const TONE: Record<string, { accent: string; label: string }> = {
 function OpportunityCard({ o }: { o: Opportunity }) {
   const t = TONE[o.kind] ?? { accent: 'text-ink-300', label: 'Signal' };
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 hover:border-ink-600 transition-colors">
+    <div className="p-5 hover:bg-ink-850/40 transition-colors">
       <div className={`text-[11px] font-mono uppercase tracking-[0.12em] ${t.accent} mb-3`}>{t.label}</div>
       <div className="text-[15px] font-medium text-ink-100 leading-snug mb-2">{o.headline}</div>
       <p className="text-[13px] leading-relaxed text-ink-300">{o.detail}</p>
@@ -264,15 +264,15 @@ function Standings({
         {rows.map(r => <StandingsCard key={r.accountId} r={r} history={historyByAccount[r.accountId] ?? []} />)}
       </div>
 
-      <div className="hidden lg:block rounded-xl border border-ink-700 overflow-hidden">
+      <div className="hidden lg:block border border-ink-700 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-ink-700">
               <th className="px-5 py-3 text-left text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Channel</th>
               <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Followers</th>
               <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Share</th>
-              <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Per day</th>
-              <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Engagement</th>
+              <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Net /day</th>
+              <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Engmt %</th>
               <th className="px-5 py-3 text-right text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400">Gap above</th>
               <th className="px-5 py-3 text-left text-[11px] font-mono uppercase tracking-[0.1em] text-ink-400 w-[120px]">Trend</th>
             </tr>
@@ -290,7 +290,7 @@ function Standings({
                     <span className={`text-[15px] ${r.isOwn ? 'text-flare-400 font-medium' : 'text-ink-100'}`}>{r.label}</span>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-right text-[15px] text-ink-100 tabular-nums">
+                <td className="px-5 py-4 text-right font-mono text-[14px] text-ink-100 tabular-nums">
                   {r.followers.toLocaleString('en-US')}
                 </td>
                 <td className="px-5 py-4">
@@ -304,11 +304,11 @@ function Standings({
                     <span className="text-[13px] text-ink-300 tabular-nums w-8 text-right">{r.sharePct.toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-right text-[15px] tabular-nums"><Rate value={r.growth.perDay} /></td>
-                <td className="px-5 py-4 text-right text-[15px] text-ink-200 tabular-nums">
+                <td className="px-5 py-4 text-right font-mono text-[14px] tabular-nums"><Rate value={r.growth.perDay} /></td>
+                <td className="px-5 py-4 text-right font-mono text-[14px] text-ink-200 tabular-nums">
                   {r.engagementRatePct === null ? <Dash /> : `${r.engagementRatePct.toFixed(2)}%`}
                 </td>
-                <td className="px-5 py-4 text-right text-[15px] text-ink-300 tabular-nums">
+                <td className="px-5 py-4 text-right font-mono text-[14px] text-ink-300 tabular-nums">
                   {r.gapToNext === null ? <span className="text-[13px] text-ink-500">leader</span> : r.gapToNext.toLocaleString('en-US')}
                 </td>
                 <td className="px-5 py-4">
@@ -331,7 +331,7 @@ function Standings({
 
 function StandingsCard({ r, history }: { r: RankRow; history: number[] }) {
   return (
-    <div className={`rounded-xl border p-4 ${r.isOwn ? 'bg-flare-500/[0.06] border-flare-500/30' : 'bg-ink-900 border-ink-700'}`}>
+    <div className={`border p-4 ${r.isOwn ? 'bg-flare-500/[0.06] border-flare-500/30' : 'bg-ink-900 border-ink-700'}`}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-[13px] font-mono text-ink-400 tabular-nums shrink-0">{r.rank}</span>
@@ -347,8 +347,8 @@ function StandingsCard({ r, history }: { r: RankRow; history: number[] }) {
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <MiniStat label="Per day"><Rate value={r.growth.perDay} /></MiniStat>
-        <MiniStat label="Engagement">
+        <MiniStat label="Net /day"><Rate value={r.growth.perDay} /></MiniStat>
+        <MiniStat label="Engmt %">
           {r.engagementRatePct === null ? <Dash /> : <span className="text-ink-100">{r.engagementRatePct.toFixed(2)}%</span>}
         </MiniStat>
         <MiniStat label="Gap above">
