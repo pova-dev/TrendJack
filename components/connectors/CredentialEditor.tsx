@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { deleteWithStepUp } from '@/lib/client/step-up';
 
 interface CredItem { key: string; mask: string }
 interface KeySpec { key: string; label?: string; placeholder?: string; helper?: string; secret?: boolean }
@@ -26,6 +27,7 @@ export function CredentialEditor({ title, subtitle, keys, initial, rightSlot }: 
   const [draft, setDraft] = React.useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = React.useState<string | null>(null);
   const [savedKey, setSavedKey] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   function maskFor(k: string) { return items.find(i => i.key === k)?.mask; }
   function isSet(k: string) { return items.some(i => i.key === k); }
@@ -52,8 +54,11 @@ export function CredentialEditor({ title, subtitle, keys, initial, rightSlot }: 
 
   async function remove(k: string) {
     setBusyKey(k);
-    try { await fetch(`/api/credentials?key=${k}`, { method: 'DELETE' }); await reload(); }
-    finally { setBusyKey(null); }
+    try {
+      const res = await deleteWithStepUp(`/api/credentials?key=${k}`);
+      if (res.ok) { setError(null); await reload(); }
+      else if (res.reason !== 'cancelled') setError(res.message ?? 'Could not remove that key.');
+    } finally { setBusyKey(null); }
   }
 
   return (
@@ -65,6 +70,11 @@ export function CredentialEditor({ title, subtitle, keys, initial, rightSlot }: 
         </div>
         {rightSlot}
       </header>
+      {error ? (
+        <div role="alert" className="rounded border border-signal-red/40 bg-signal-red/10 px-2 py-1.5 text-2xs text-bad-300">
+          {error}
+        </div>
+      ) : null}
       <div className="space-y-2">
         {keys.map(spec => {
           const set = isSet(spec.key);

@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { deleteWithStepUp } from '@/lib/client/step-up';
 
 interface Webhook { id: string; name: string; url: string; events: string[]; active: boolean }
 
@@ -18,6 +19,7 @@ export function WebhookManager({ initial }: { initial: Webhook[] }) {
   const [url, setUrl] = React.useState('');
   const [picked, setPicked] = React.useState<string[]>(['trend.post_now', 'draft.shipped']);
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function add() {
     if (!url) return;
@@ -36,12 +38,20 @@ export function WebhookManager({ initial }: { initial: Webhook[] }) {
   }
 
   async function remove(id: string) {
-    await fetch(`/api/webhooks?id=${id}`, { method: 'DELETE' });
-    setHooks(hooks.filter(h => h.id !== id));
+    const res = await deleteWithStepUp(`/api/webhooks?id=${id}`);
+    // Only drop the row once the server confirms. Removing it optimistically
+    // made a denied delete look like it worked until the next refresh.
+    if (res.ok) { setHooks(hooks.filter(h => h.id !== id)); setError(null); return; }
+    if (res.reason !== 'cancelled') setError(res.message ?? 'Could not remove that webhook.');
   }
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <div role="alert" className="rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-bad-300">
+          {error}
+        </div>
+      ) : null}
       <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
         <h2 className="text-sm font-semibold text-ink-100 mb-3">Add webhook</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

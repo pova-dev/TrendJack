@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { deleteWithStepUp } from '@/lib/client/step-up';
 
 interface TgConn {
   id: string; name: string; defaultChatId: string;
@@ -51,8 +52,11 @@ export function TelegramManager({ initial }: { initial: TgConn[] }) {
   }
 
   async function remove(id: string) {
-    await fetch(`/api/telegram?id=${id}`, { method: 'DELETE' });
-    setConns(conns.filter(c => c.id !== id));
+    const res = await deleteWithStepUp(`/api/telegram?id=${id}`);
+    // Confirmed removals only. The row used to disappear even when the server
+    // refused, which reads as success and is not.
+    if (res.ok) { setConns(conns.filter(c => c.id !== id)); return; }
+    if (res.reason !== 'cancelled') setTestResult(`✗ ${res.message ?? 'could not remove'}`);
   }
 
   return (

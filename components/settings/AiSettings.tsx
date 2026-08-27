@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { deleteWithStepUp } from '@/lib/client/step-up';
 
 interface CredItem { id: string; scope: string; key: string; mask: string; updatedAt: string }
 
@@ -69,6 +70,7 @@ export function AiSettings({ initial }: { initial: CredItem[] }) {
   const [draft, setDraft] = React.useState<Record<string, string>>({});
   const [busy, setBusy] = React.useState(false);
   const [savedKey, setSavedKey] = React.useState<string | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   function isSet(envKey: string) { return creds.some(c => c.key === envKey); }
   function maskFor(envKey: string) { return creds.find(c => c.key === envKey)?.mask; }
@@ -93,10 +95,13 @@ export function AiSettings({ initial }: { initial: CredItem[] }) {
     if (!isSet(envKey)) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/credentials?key=${envKey}`, { method: 'DELETE' });
+      const res = await deleteWithStepUp(`/api/credentials?key=${envKey}`);
       if (res.ok) {
         const list = await fetch('/api/credentials').then(r => r.json()) as CredItem[];
         setCreds(list);
+        setDeleteError(null);
+      } else if (res.reason !== 'cancelled') {
+        setDeleteError(res.message ?? 'Could not remove that key.');
       }
     } finally { setBusy(false); }
   }
@@ -105,6 +110,11 @@ export function AiSettings({ initial }: { initial: CredItem[] }) {
 
   return (
     <div className="space-y-5">
+      {deleteError ? (
+        <div role="alert" className="rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-bad-300">
+          {deleteError}
+        </div>
+      ) : null}
       <div className="rounded-md border border-ink-700 bg-ink-900 p-4">
         <div className="flex items-center gap-3">
           <Chip tone={anyConfigured ? 'good' : 'bad'}>

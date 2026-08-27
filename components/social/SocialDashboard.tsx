@@ -6,6 +6,7 @@ import { Sparkline } from './Sparkline';
 import { LiveCounter, compact } from './LiveCounter';
 import { AddAccountForm } from './AddAccountForm';
 import { PlatformGlyph, platformLabel } from './PlatformGlyph';
+import { deleteWithStepUp } from '@/lib/client/step-up';
 
 /** Refresh cadence for the counters. Matches the server poll interval — no
  *  point asking more often than the data can change. */
@@ -360,21 +361,29 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 
 function RemoveButton({ id, onRemoved }: { id: string; onRemoved: () => void }) {
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        await fetch(`/api/social/accounts?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-        setBusy(false);
-        onRemoved();
-      }}
-      aria-label="Stop tracking this channel"
-      className="text-2xs font-mono text-ink-500 hover:text-signal-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 rounded px-2 py-2 -my-1 disabled:opacity-50 shrink-0"
-    >
-      remove
-    </button>
+    <div className="shrink-0 flex flex-col items-end">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const res = await deleteWithStepUp(`/api/social/accounts?id=${encodeURIComponent(id)}`);
+          setBusy(false);
+          // The old code swallowed every failure and called onRemoved anyway,
+          // so a refused delete still looked like the channel was untracked.
+          if (res.ok) { onRemoved(); return; }
+          if (res.reason !== 'cancelled') setError(res.message ?? 'could not remove');
+        }}
+        aria-label="Stop tracking this channel"
+        className="text-2xs font-mono text-ink-500 hover:text-signal-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 rounded px-2 py-2 -my-1 disabled:opacity-50"
+      >
+        remove
+      </button>
+      {error ? <span role="alert" className="mt-1 text-2xs text-bad-300 max-w-[12rem] text-right">{error}</span> : null}
+    </div>
   );
 }
 
