@@ -111,10 +111,17 @@ const RATES: Record<string, [number, number]> = {
   'gemini-2.5-pro':     [1.25, 10.0],
   'gemini-2.5-flash':   [0.075, 0.3],
   'gemini-2.0-flash-001': [0.075, 0.3],
-  // OpenRouter passthroughs (mirror upstream)
-  'anthropic/claude-sonnet-4-5':         [3.0,  15.0],
+  'claude-sonnet-5':    [3.0,  15.0],
+  // OpenRouter passthroughs (mirror upstream). Rates below read from
+  // /api/v1/models on 2026-08-27 and converted from per-token to per-1M.
+  // Note the id spelling: OpenRouter uses a dot in point releases where
+  // Anthropic's own API uses a dash, so the two columns are not interchangeable.
+  'anthropic/claude-sonnet-5':           [2.0,  10.0],
+  'anthropic/claude-sonnet-4.5':         [3.0,  15.0],
+  'anthropic/claude-haiku-4.5':          [1.0,   5.0],
   'meta-llama/llama-3.3-70b-instruct':   [0.35, 0.4],
-  'google/gemini-2.0-flash-001':         [0.075, 0.3],
+  'google/gemini-3.5-flash-lite':        [0.30,  2.5],
+  'google/gemini-2.5-flash':             [0.075, 0.3],
 };
 
 export function estimateCostUsd(

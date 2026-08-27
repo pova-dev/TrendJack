@@ -12,9 +12,9 @@
 //   - openrouter (one key, all models — Claude / Kimi-K2 / Llama / DeepSeek / etc.)
 //
 // Default routing (when OPENROUTER_API_KEY present):
-//   cheap     →  google/gemini-2.0-flash-001          (~$0.10 / $0.40 per M)
-//   balanced  →  moonshotai/kimi-k2                   (~$0.55 / $2.20 per M)
-//   premium   →  anthropic/claude-sonnet-4-5          (~$3 / $15 per M)
+//   cheap     →  google/gemini-3.5-flash-lite         (~$0.30 / $2.50 per M)
+//   balanced  →  meta-llama/llama-3.3-70b-instruct    (~$0.35 / $0.40 per M)
+//   premium   →  anthropic/claude-sonnet-5            (~$2 / $10 per M)
 //
 // Direct keys (Anthropic / OpenAI / Gemini) take precedence for their tier
 // when present, since native APIs have lower latency and prompt-caching
@@ -96,25 +96,34 @@ export function pickRouting(tier: AiTier, creds?: OrgCredentials): Routing {
   const envModel    = pick(creds, `TJ_MODEL_${tier.toUpperCase()}`);
   if (envProvider && envModel) return { provider: envProvider, model: envModel };
 
+  // Model IDs differ by route for the SAME model: Anthropic's own API spells it
+  // claude-sonnet-5, OpenRouter spells it anthropic/claude-sonnet-5, and
+  // OpenRouter uses dots in point releases (claude-sonnet-4.5) where Anthropic
+  // uses dashes (claude-sonnet-4-5). Prefixing the Anthropic-style id with
+  // "anthropic/" therefore produces an id OpenRouter does not have, which is
+  // what was here and why every premium call 404'd. Verified against
+  // /api/v1/models on 2026-08-27.
   if (tier === 'premium') {
-    if (hasAnthropic && !forceOpenRouter) return { provider: 'anthropic',  model: 'claude-sonnet-4-5' };
-    if (hasOpenRouter)                    return { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-5' };
+    if (hasAnthropic && !forceOpenRouter) return { provider: 'anthropic',  model: 'claude-sonnet-5' };
+    if (hasOpenRouter)                    return { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' };
     if (hasOpenAI)                        return { provider: 'openai',     model: 'gpt-4o' };
     if (hasGoogle)                        return { provider: 'google',     model: 'gemini-2.5-pro' };
-    if (hasAnthropic)                     return { provider: 'anthropic',  model: 'claude-sonnet-4-5' };
+    if (hasAnthropic)                     return { provider: 'anthropic',  model: 'claude-sonnet-5' };
   }
 
   if (tier === 'balanced') {
     // Llama 3.3 70B has the most stable OpenRouter availability today.
     // Users can pin Kimi-K2, DeepSeek, etc. via TJ_MODEL_BALANCED.
     if (hasOpenRouter) return { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct' };
-    if (hasAnthropic)  return { provider: 'anthropic',  model: 'claude-sonnet-4-5' };
+    if (hasAnthropic)  return { provider: 'anthropic',  model: 'claude-sonnet-5' };
     if (hasOpenAI)     return { provider: 'openai',     model: 'gpt-4o-mini' };
     if (hasGoogle)     return { provider: 'google',     model: 'gemini-2.5-flash' };
   }
 
   if (tier === 'cheap') {
-    if (hasOpenRouter) return { provider: 'openrouter', model: 'google/gemini-2.0-flash-001' };
+    // gemini-2.0-flash-001 was delisted from OpenRouter; the call 404'd rather
+    // than falling back, so triage silently produced nothing.
+    if (hasOpenRouter) return { provider: 'openrouter', model: 'google/gemini-3.5-flash-lite' };
     if (hasGoogle)     return { provider: 'google',     model: 'gemini-2.0-flash-001' };
     if (hasOpenAI)     return { provider: 'openai',     model: 'gpt-4o-mini' };
     if (hasAnthropic)  return { provider: 'anthropic',  model: 'claude-haiku-4-5' };
@@ -281,8 +290,13 @@ async function callGoogle(model: string, opts: AiRunOptions): Promise<AiResponse
 //   2. Kimi K2 0905 (K2.5)      — Claude-tier reasoning, often cheaper
 //   3. Llama 3.3 70B            — most consistently available baseline
 //   4. Gemini 2.5 Flash         — fast last-resort
+// Every id here must exist in OpenRouter's catalog, or the fallback chain is
+// decoration. The first entry was anthropic/claude-sonnet-4-5, which OpenRouter
+// has never had (it spells point releases with a dot), so the premium fallback
+// burned a round trip on a guaranteed 404 before moving on.
+// Checked against /api/v1/models on 2026-08-27.
 const OR_FALLBACKS = [
-  'anthropic/claude-sonnet-4-5',
+  'anthropic/claude-sonnet-5',
   'moonshotai/kimi-k2-0905',
   'meta-llama/llama-3.3-70b-instruct',
   'google/gemini-2.5-flash',
