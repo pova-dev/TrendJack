@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentContext } from '@/lib/auth';
 import { listCredentials, upsertCredential, deleteCredential } from '@/lib/credentials';
 import { logAudit } from '@/lib/store';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 // Audit 2026-05-29 D3 — Slack / Sheets / Notion credential keys are now
 // surface-able via the UI editor instead of env-var-only.
@@ -64,6 +65,11 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('credential:write'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await getCurrentContext();
   if (!ctx?.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const body = await req.json() as { entries?: Array<{ key: string; value: string }> };
@@ -87,6 +93,11 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('credential:write'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await getCurrentContext();
   if (!ctx?.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const key = req.nextUrl.searchParams.get('key');

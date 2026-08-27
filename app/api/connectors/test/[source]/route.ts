@@ -4,6 +4,7 @@ import { getConnector } from '@/lib/connectors';
 import { getOrgCredentials } from '@/lib/credentials';
 import { getBrand } from '@/lib/store';
 import type { SourceId } from '@/types';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,11 @@ export const dynamic = 'force-dynamic';
 // source is actually live before hitting the global Refresh button.
 
 export async function POST(_req: Request, ctx: { params: Promise<{ source: string }> }) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('credential:write'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const auth = await getCurrentContext();
   if (!auth?.brand || !auth.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { source } = await ctx.params;

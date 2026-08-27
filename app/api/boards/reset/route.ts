@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentContext } from '@/lib/auth';
 import { logAudit } from '@/lib/store';
 import { publishBrandTrend } from '@/lib/realtime/bus';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,11 @@ function defaultColumns() {
 // thresholds change and existing boards have stale tight filters that
 // produce empty columns.
 export async function POST() {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('board:edit'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await getCurrentContext();
   if (!ctx?.brand || !ctx.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

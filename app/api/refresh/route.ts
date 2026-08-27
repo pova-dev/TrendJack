@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentContext } from '@/lib/auth';
 import { ingestForBrand } from '@/lib/ingest';
 import { logAudit } from '@/lib/store';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,11 @@ export const dynamic = 'force-dynamic';
 // POST /api/refresh — pull fresh signals for the active brand from every
 // available live connector, score, dedupe, persist, broadcast via SSE.
 export async function POST() {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('trend:act'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await getCurrentContext();
   if (!ctx?.brand || !ctx.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   try {

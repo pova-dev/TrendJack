@@ -14,6 +14,7 @@ import { getOrgCredentials } from '@/lib/credentials';
 import { buildDailyBrief, engagementRate, type AccountSeries } from '@/lib/social/analytics';
 import { generateBriefNarrative, analyzeViralPatterns, type ViralPost } from '@/lib/social/brief';
 import type { SocialPlatform } from '@/lib/social/types';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('draft:create'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await requireBrand();
   const body = await req.json().catch(() => ({})) as { windowDays?: number; want?: string[] };
   const windowDays = body.windowDays ?? 7;

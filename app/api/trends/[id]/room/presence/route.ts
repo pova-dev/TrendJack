@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentContext } from '@/lib/auth';
 import { getTrend } from '@/lib/store';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,11 @@ function activeFor(trendId: string): PresenceEntry[] {
 }
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('room:comment'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const auth = await getCurrentContext();
   if (!auth?.brand) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
@@ -91,6 +97,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 // on tab unload). Best-effort; TTL handles tabs that closed without a
 // chance to fire this.
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('room:comment'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const auth = await getCurrentContext();
   if (!auth?.brand) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;

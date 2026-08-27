@@ -3,8 +3,14 @@ import { sendToSlack } from '@/lib/integrations/slack';
 import { exportToSheets } from '@/lib/integrations/sheets';
 import { sendWebhook } from '@/lib/integrations/notion';
 import { getCurrentContext } from '@/lib/auth';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ type: string }> }) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('trend:act'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   // SECURITY: this route was previously unauthenticated — anyone with the
   // URL could POST through to Slack / Notion / Sheets using the server's
   // tokens. Now requires a logged-in session with an active brand.

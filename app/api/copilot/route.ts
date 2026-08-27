@@ -4,6 +4,7 @@ import { getBrand, listTrends, listDrafts, listBoardsForBrand } from '@/lib/stor
 import { runChat, aiHealth } from '@/lib/ai/provider';
 import { getOrgCredentials } from '@/lib/credentials';
 import { prisma } from '@/lib/db';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,11 @@ export const dynamic = 'force-dynamic';
 // when the user's question signals high-stakes brand-voice arbitration.
 
 export async function POST(req: NextRequest) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('draft:create'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await getCurrentContext();
   if (!ctx?.brand || !ctx.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const body = await req.json() as { question: string };

@@ -8,6 +8,7 @@ import { getOrgCredentials } from '@/lib/credentials';
 import { aiHealth } from '@/lib/ai/provider';
 import { prisma } from '@/lib/db';
 import type { ResearchResult } from '@/lib/research';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,11 @@ export const runtime = 'nodejs';
 //   }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('draft:create'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const auth = await getCurrentContext();
   if (!auth?.brand || !auth.org) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireBrand } from '@/lib/auth';
 import { addAccount, isPlatform, listAccounts, removeAccount } from '@/lib/social/store';
+import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('social:manage'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await requireBrand();
   const body = await req.json().catch(() => null) as {
     platform?: string; handle?: string; isOwn?: boolean; competitorName?: string;
@@ -35,6 +41,11 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // Permission gate. Deny-by-default: this route mutates state, so it must
+  // name the capability it needs. See lib/auth/capabilities.ts.
+  try { await requireCapability('social:manage'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
   const ctx = await requireBrand();
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
