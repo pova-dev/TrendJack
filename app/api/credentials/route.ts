@@ -95,7 +95,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   // Permission gate. Deny-by-default: this route mutates state, so it must
   // name the capability it needs. See lib/auth/capabilities.ts.
-  try { await requireCapability('credential:write'); }
+  try { await requireCapability('resource:delete'); }
   catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
 
   const ctx = await getCurrentContext();

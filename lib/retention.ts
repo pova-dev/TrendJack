@@ -21,6 +21,7 @@
 
 import 'server-only';
 import { prisma } from './db';
+import { pruneExpiredOtps } from './auth/otp';
 
 export interface RetentionPolicy {
   /** Drop samples older than this. Default 14 days. */
@@ -54,6 +55,9 @@ export interface RetentionResult {
   samplesDeleted: number;
   trendsDeleted: number;
   socialSamplesDeleted: number;
+  /** Spent verification codes. Housekeeping only: verifyOtp checks expiry on
+   *  every attempt, so an unpruned row is never a usable code. */
+  otpCodesDeleted: number;
   dryRun: boolean;
   policy: RetentionPolicy;
 }
@@ -70,13 +74,18 @@ export async function previewRetention(policy = policyFromEnv()): Promise<Retent
   const sampleCut = daysAgo(policy.sampleRetentionDays);
   const trendCut = daysAgo(policy.trendRetentionDays);
 
-  const [samples, trends, socialSamples] = await Promise.all([
+  const otpCut = daysAgo(1);
+  const [samples, trends, socialSamples, otpCodes] = await Promise.all([
     countExpiredSamples(sampleCut, policy.minSamplesPerTrend),
     countExpiredTrends(trendCut),
     prisma.socialSample.count({ where: { sampledAt: { lt: sampleCut } } }),
+    prisma.otpCode.count({ where: { OR: [{ expiresAt: { lt: otpCut } }, { consumedAt: { lt: otpCut } }] } }),
   ]);
 
-  return { samplesDeleted: samples, trendsDeleted: trends, socialSamplesDeleted: socialSamples, dryRun: true, policy };
+  return {
+    samplesDeleted: samples, trendsDeleted: trends, socialSamplesDeleted: socialSamples,
+    otpCodesDeleted: otpCodes, dryRun: true, policy,
+  };
 }
 
 /** Rows older than the cutoff, excluding each trend's most recent N. */
@@ -153,7 +162,11 @@ export async function runRetention(policy = policyFromEnv()): Promise<RetentionR
     sampleCut, policy.minSamplesPerTrend,
   );
 
-  return { samplesDeleted, trendsDeleted, socialSamplesDeleted, dryRun: false, policy };
+  // Fixed 24h window rather than the configurable one: a code is dead five
+  // minutes after issue, so there is no operator judgement to expose here.
+  const otpCodesDeleted = await pruneExpiredOtps();
+
+  return { samplesDeleted, trendsDeleted, socialSamplesDeleted, otpCodesDeleted, dryRun: false, policy };
 }
 
 declare global {

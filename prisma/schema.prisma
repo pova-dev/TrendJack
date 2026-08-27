@@ -24,6 +24,10 @@ model User {
   createdAt     DateTime     @default(now())
   memberships   Membership[]
   auditLogs     AuditLog[]
+  otpCodes      OtpCode[]
+  /// Second factor. Enforced for admin and owner; optional below that.
+  /// Null means the user has never completed enrolment.
+  mfaEnabledAt  DateTime?
 }
 
 model Organization {
@@ -731,4 +735,36 @@ model SocialComment {
 
   @@unique([postId, externalId])
   @@index([postId, postedAt])
+}
+
+/// One-time codes for second-factor and step-up verification.
+///
+/// The code itself is NEVER stored. Only a SHA-256 hash goes in the row, so a
+/// database read (backup, dump, compromised replica) does not hand anyone a
+/// working code. Verification hashes the submitted value and compares.
+///
+/// Rows are single-use and short-lived. `consumedAt` closes replay, `attempts`
+/// closes brute force, and expired rows are pruned by the retention sweep, so
+/// this table cannot grow without bound.
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the code. Never the code.
+  codeHash  String
+  /// What this code authorises: 'login' proves identity at sign-in,
+  /// 'step_up' authorises one destructive action. Kept separate so a code
+  /// mailed for login can never be replayed to approve a deletion.
+  purpose   String
+  expiresAt DateTime
+  /// Failed verification count. At the cap the row is dead regardless of
+  /// whether the correct code arrives afterwards.
+  attempts  Int      @default(0)
+  consumedAt DateTime?
+  /// Recorded for the audit trail, not for authorisation.
+  requestIp String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose, createdAt])
+  @@index([expiresAt])
 }

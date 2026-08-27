@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import {
-  can, capabilitiesFor, ALL_ROLES, ALL_CAPABILITIES,
+  can, capabilitiesFor, needsStepUp, ALL_ROLES, ALL_CAPABILITIES,
   type Role, type Capability,
 } from '@/lib/auth/capabilities';
 
@@ -96,6 +96,40 @@ describe('role boundaries that matter', () => {
   });
 });
 
+describe('deletion', () => {
+  it('is admin and owner only', () => {
+    expect(can('owner', 'resource:delete')).toBe(true);
+    expect(can('admin', 'resource:delete')).toBe(true);
+    for (const r of ['strategist', 'operator', 'approver', 'viewer'] as Role[]) {
+      expect(can(r, 'resource:delete'), `${r} must not delete`).toBe(false);
+    }
+  });
+
+  it('is never implied by being able to create or edit the same thing', () => {
+    // A strategist manages social accounts and boards, and still cannot
+    // destroy either. Deletion has no undo, so it does not ride along with
+    // write access.
+    expect(can('strategist', 'social:manage')).toBe(true);
+    expect(can('strategist', 'board:edit')).toBe(true);
+    expect(can('strategist', 'resource:delete')).toBe(false);
+  });
+
+  it('additionally requires a fresh code, not just the role', () => {
+    // The role answers "allowed to". Step-up answers "actually present".
+    // A stolen session carries the role with it.
+    expect(needsStepUp('resource:delete')).toBe(true);
+    expect(needsStepUp('org:admin')).toBe(true);
+  });
+
+  it('does not demand a code for routine work', () => {
+    // Making every action need an email would train people to click through
+    // codes without reading them, which is worse than not having them.
+    for (const c of ['trend:act', 'draft:create', 'board:edit', 'brand:edit'] as Capability[]) {
+      expect(needsStepUp(c), `${c} should not require step-up`).toBe(false);
+    }
+  });
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 // Coverage: every mutating route must be guarded.
 // ───────────────────────────────────────────────────────────────────────────
@@ -127,7 +161,24 @@ const EXEMPT = new Map<string, string>([
   ['auth/signout/route.ts', 'ends a session; requires no capability'],
   ['health/route.ts', 'liveness probe'],
   ['push/subscribe/route.ts', 'per-user self-service: registers the callers own browser for notifications, grants no access to data'],
+  // Issues and checks the caller's own verification code. Requiring a
+  // capability here would be circular: this is the endpoint you go through to
+  // satisfy the step-up check, so gating it behind a capability that itself
+  // needs step-up would make deletion permanently unreachable. It authenticates
+  // the session directly instead, and touches nothing but the caller's own
+  // codes.
+  ['auth/otp/route.ts', 'grants the step-up itself; gating it on a capability would be circular'],
 ]);
+
+/** DELETEs that remove nothing anyone would miss, so they are not gated on
+ *  the admin-only delete capability. Each is a deliberate call. */
+const DELETE_EXEMPT = [
+  // Unsubscribes the caller's OWN browser from notifications. Requiring admin
+  // would stop a viewer turning off their own alerts.
+  'push/subscribe/route.ts',
+  // Means "I left the room". Nothing is destroyed.
+  'trends/[id]/room/presence/route.ts',
+];
 
 describe('route guard coverage', () => {
   const files = routeFiles(API_ROOT);
@@ -161,6 +212,29 @@ describe('route guard coverage', () => {
       unguarded,
       `These routes mutate state with no permission check. Add requireCapability(), ` +
       `or add an entry to EXEMPT with the reason:\n  ${unguarded.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('makes every destructive DELETE ask for resource:delete', () => {
+    // A DELETE guarded by, say, credential:write would let a strategist
+    // destroy something they can only configure. Deletion is its own gate.
+    const weak: string[] = [];
+
+    for (const file of files) {
+      const rel = relative(API_ROOT, file);
+      const src = readFileSync(file, 'utf8');
+      const at = src.indexOf('export async function DELETE');
+      if (at < 0) continue;
+      if (DELETE_EXEMPT.some(k => rel.endsWith(k))) continue;
+
+      const after = src.slice(at);
+      const cap = after.match(/requireCapability\('([^']+)'\)/)?.[1];
+      if (cap !== 'resource:delete') weak.push(`${rel} uses "${cap ?? 'no guard'}"`);
+    }
+
+    expect(
+      weak,
+      `These DELETE handlers do not require resource:delete:\n  ${weak.join('\n  ')}`,
     ).toEqual([]);
   });
 });

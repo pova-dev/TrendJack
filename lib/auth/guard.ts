@@ -11,7 +11,8 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { getCurrentContext } from '@/lib/auth';
-import { can, type Capability, type Role } from './capabilities';
+import { can, needsStepUp, type Capability, type Role } from './capabilities';
+import { hasStepUp } from './step-up';
 import { logAudit } from '@/lib/store';
 
 export class ForbiddenError extends Error {
@@ -21,6 +22,13 @@ export class ForbiddenError extends Error {
   ) {
     super(`role "${role ?? 'none'}" lacks capability "${capability}"`);
     this.name = 'ForbiddenError';
+  }
+}
+
+export class StepUpNeededError extends Error {
+  constructor(readonly capability: Capability) {
+    super(`"${capability}" needs a fresh verification code`);
+    this.name = 'StepUpNeededError';
   }
 }
 
@@ -62,6 +70,13 @@ export async function requireCapability(capability: Capability): Promise<Guarded
     throw new ForbiddenError(capability, role);
   }
 
+  // Role says allowed; now confirm the person is actually present. Checked
+  // after the role so someone who could never perform the action is told that,
+  // rather than being sent to fetch a code that would not have helped.
+  if (needsStepUp(capability) && !(await hasStepUp())) {
+    throw new StepUpNeededError(capability);
+  }
+
   return {
     user: { id: ctx.user.id, email: ctx.user.email, name: ctx.user.name },
     org: { id: ctx.org.id },
@@ -80,6 +95,15 @@ export async function requireCapability(capability: Capability): Promise<Guarded
 export function guardErrorResponse(e: unknown): NextResponse | null {
   if (e instanceof UnauthenticatedError) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (e instanceof StepUpNeededError) {
+    // 403 with a machine-readable marker, so the UI can open the code prompt
+    // rather than showing a dead end.
+    return NextResponse.json({
+      error: 'step_up_required',
+      capability: e.capability,
+      message: 'Enter the code sent to your email to confirm this deletion.',
+    }, { status: 403 });
   }
   if (e instanceof ForbiddenError) {
     return NextResponse.json({

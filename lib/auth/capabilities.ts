@@ -42,6 +42,10 @@ export type Capability =
   | 'social:manage'     // tracked accounts
   | 'brand:edit'        // profile, keywords, competitors
   | 'credential:write'  // API keys
+  // Destruction. Separated from every other capability on purpose: deleting
+  // is the one action with no undo, so it is never implied by the ability to
+  // create or edit the same thing.
+  | 'resource:delete'
   // Administration
   | 'member:manage'     // invites, role changes
   | 'org:admin';        // destructive org-level operations
@@ -75,6 +79,9 @@ const STRATEGIST: Capability[] = [
 const ADMIN: Capability[] = [
   ...STRATEGIST,
   'brand:edit', 'credential:write', 'member:manage',
+  // Deletion stops here. A strategist configures the product and a strategist
+  // cannot destroy any part of it.
+  'resource:delete',
 ];
 
 const OWNER: Capability[] = [...ADMIN, 'org:admin'];
@@ -94,7 +101,7 @@ export const ALL_CAPABILITIES: Capability[] = [
   'trend:act', 'draft:create', 'room:comment', 'room:vote',
   'draft:approve', 'plan:approve', 'room:decide',
   'board:edit', 'scoring:edit', 'social:manage', 'brand:edit', 'credential:write',
-  'member:manage', 'org:admin',
+  'resource:delete', 'member:manage', 'org:admin',
 ];
 
 /**
@@ -128,3 +135,19 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   approver: 'Reviews and approves. Cannot create the work being approved.',
   viewer: 'Read only.',
 };
+
+/**
+ * Capabilities that need a fresh code even when the role allows them.
+ *
+ * Role answers "is this person allowed to". Step-up answers "is this person
+ * actually here". A borrowed laptop or a stolen session cookie carries the
+ * role with it, which is exactly the case deletion needs protecting from.
+ */
+export const STEP_UP_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>([
+  'resource:delete',
+  'org:admin',
+]);
+
+export function needsStepUp(capability: Capability): boolean {
+  return STEP_UP_CAPABILITIES.has(capability);
+}

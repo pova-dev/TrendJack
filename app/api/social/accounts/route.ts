@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   // Permission gate. Deny-by-default: this route mutates state, so it must
   // name the capability it needs. See lib/auth/capabilities.ts.
-  try { await requireCapability('social:manage'); }
+  try { await requireCapability('resource:delete'); }
   catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
 
   const ctx = await requireBrand();
