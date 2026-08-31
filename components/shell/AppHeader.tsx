@@ -30,7 +30,8 @@ interface Tab { href: string; label: string; match: (p: string) => boolean }
 // data may as well not exist, which is why they are grouped and surfaced here
 // rather than left to a four-item icon rail.
 const TABS: Tab[] = [
-  { href: '/',        label: 'Board',   match: p => p === '/' },
+  { href: '/',        label: 'Today',   match: p => p === '/' },
+  { href: '/board',   label: 'Board',   match: p => p.startsWith('/board') },
   { href: '/social',  label: 'Social',  match: p => p.startsWith('/social') },
   { href: '/queue',   label: 'Queue',   match: p => p.startsWith('/queue') },
   { href: '/alerts',  label: 'Alerts',  match: p => p.startsWith('/alerts') },

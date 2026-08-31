@@ -8,12 +8,14 @@ import {
   IconBoards, IconQueue, IconBrand, IconConnectors,
   IconScoring, IconAlerts, IconIntegrations, IconAudit,
   IconSparkle, IconSettings, IconLogout, IconSocial,
+  IconToday,
 } from './icons';
 
 // Primary nav — only the "live work" pages: dashboard, draft queue, and the
 // social channel monitor. Everything configurable lives behind Settings.
 const ITEMS = [
-  { href: '/',         label: 'Boards',      Icon: IconBoards },
+  { href: '/',         label: 'Today',       Icon: IconToday },
+  { href: '/board',    label: 'Board',       Icon: IconBoards },
   { href: '/queue',    label: 'Draft queue', Icon: IconQueue },
   { href: '/social',   label: 'Social',      Icon: IconSocial },
 ];

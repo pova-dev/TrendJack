@@ -18,6 +18,20 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
   const [board, setBoard] = React.useState<BoardConfig>(initialBoard);
   const [trends, setTrends] = React.useState<Trend[]>(initialTrends);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+
+  // Deep link support: /board?trend=<id> opens that trend's drawer.
+  //
+  // The Today view ranks decisions and links straight at one. Landing on the
+  // board with the drawer shut would make the user hunt through 13 columns for
+  // the row they just clicked, which defeats the point of ranking it.
+  //
+  // Read once on mount rather than kept in sync with the URL: closing the
+  // drawer should not need a navigation, and re-opening on every render would
+  // make the close button appear broken.
+  React.useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('trend');
+    if (id) setActiveId(id);
+  }, []);
   const [tickAt, setTickAt] = React.useState<Date>(new Date());
   const [columnEditor, setColumnEditor] = React.useState<{ open: boolean; col?: ColumnConfig } | null>(null);
 

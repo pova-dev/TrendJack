@@ -14,6 +14,16 @@ const base = {
   strokeLinejoin: 'round' as const,
 };
 
+// A target rather than a calendar: the view answers "what needs me now",
+// which is not the same question a date implies.
+export const IconToday = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+  </svg>
+);
+
 export const IconBoards = (p: React.SVGProps<SVGSVGElement>) => (
   <svg {...base} {...p}>
     <rect x="3"  y="4" width="5"  height="16" rx="1.2" />
