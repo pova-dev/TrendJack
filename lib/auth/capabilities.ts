@@ -18,37 +18,16 @@
 // "forgot to check" becomes a red CI run rather than a silent hole.
 
 import 'server-only';
+// Vocabulary lives in a client-safe module so a members screen can render a
+// role picker without dragging the matrix into the browser bundle. The matrix
+// and can() stay here, server-side, where the decision belongs.
+export {
+  ALL_ROLES, ALL_CAPABILITIES, ROLE_DESCRIPTIONS,
+  type Role, type Capability,
+} from './role-data';
+import type { Role, Capability } from './role-data';
 
-export type Role = 'owner' | 'admin' | 'strategist' | 'operator' | 'approver' | 'viewer';
 
-/**
- * Named actions. Deliberately about INTENT rather than mechanism: `brand:edit`
- * rather than `PUT /api/brand`, so the matrix survives routes being renamed or
- * split.
- */
-export type Capability =
-  // Day-to-day operator work
-  | 'trend:act'         // save, dismiss, pin, un-pin
-  | 'draft:create'      // generate a draft, run research
-  | 'room:comment'
-  | 'room:vote'
-  // Judgement calls
-  | 'draft:approve'
-  | 'plan:approve'
-  | 'room:decide'
-  // Configuration
-  | 'board:edit'        // columns, layout
-  | 'scoring:edit'      // weights, calibration
-  | 'social:manage'     // tracked accounts
-  | 'brand:edit'        // profile, keywords, competitors
-  | 'credential:write'  // API keys
-  // Destruction. Separated from every other capability on purpose: deleting
-  // is the one action with no undo, so it is never implied by the ability to
-  // create or edit the same thing.
-  | 'resource:delete'
-  // Administration
-  | 'member:manage'     // invites, role changes
-  | 'org:admin';        // destructive org-level operations
 
 /**
  * Role to capability matrix. The single source of truth.
@@ -95,14 +74,7 @@ const MATRIX: Record<Role, ReadonlySet<Capability>> = {
   owner: new Set(OWNER),
 };
 
-export const ALL_ROLES: Role[] = ['owner', 'admin', 'strategist', 'operator', 'approver', 'viewer'];
 
-export const ALL_CAPABILITIES: Capability[] = [
-  'trend:act', 'draft:create', 'room:comment', 'room:vote',
-  'draft:approve', 'plan:approve', 'room:decide',
-  'board:edit', 'scoring:edit', 'social:manage', 'brand:edit', 'credential:write',
-  'resource:delete', 'member:manage', 'org:admin',
-];
 
 /**
  * Can this role perform this action?
@@ -126,15 +98,6 @@ export function capabilitiesFor(role: string | null | undefined): Capability[] {
   return set ? [...set] : [];
 }
 
-/** Human-readable, for permission-denied messages and the members screen. */
-export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  owner: 'Full control, including org-level and destructive actions.',
-  admin: 'Everything except org-level destruction. Manages people, brand and keys.',
-  strategist: 'Configures the product and makes calls: boards, scoring, approvals.',
-  operator: 'Day-to-day work: act on trends, generate drafts, comment and vote.',
-  approver: 'Reviews and approves. Cannot create the work being approved.',
-  viewer: 'Read only.',
-};
 
 /**
  * Capabilities that need a fresh code even when the role allows them.

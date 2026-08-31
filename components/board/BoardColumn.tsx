@@ -182,8 +182,20 @@ export function BoardColumn({
         // Mobile (<sm): column fills the viewport minus the LeftRail
         //   (60px) and a small breathing margin (8px = 4px each side
         //   from mx-1). On a 390px iPhone this gives a 322px column.
-        // Desktop (≥sm): fixed 360px so multiple columns fit on screen.
-        'flex flex-col flex-shrink-0 w-[calc(100vw-72px)] sm:w-[360px] h-[calc(100%-12px)] my-1.5 mx-1',
+        // Desktop (≥sm): flexible. Columns share the viewport evenly, with a
+        // floor so they never compress below readable, and a ceiling so two
+        // columns on a wide monitor do not become two enormous panels.
+        //
+        // Was a hard 360px. Thirteen of those is 4,940px, of which a 1440px
+        // laptop shows 3.7 — so the fourth column was always clipped mid-card,
+        // and a 1920px monitor bought nothing because the extra width went to
+        // dead space rather than to the columns. Flexible width means the
+        // board never scrolls sideways at whatever count a view holds, and
+        // wider screens make columns more readable rather than merely showing
+        // a fraction more of the next one.
+        'flex flex-col flex-shrink-0 sm:flex-shrink sm:flex-1',
+        'w-[calc(100vw-16px)] md:w-auto sm:min-w-[320px] sm:max-w-[560px]',
+        'h-[calc(100%-12px)] my-1.5 mx-1',
         'rounded-lg bg-ink-900 border border-ink-700/70 overflow-hidden',
         'transition-[opacity,border-color] duration-150 hover:border-ink-600',
         dragging && 'opacity-40 ring-1 ring-flare-500',

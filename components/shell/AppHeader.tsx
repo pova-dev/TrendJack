@@ -41,9 +41,10 @@ const TABS: Tab[] = [
 // Shown only to roles holding org:admin. Groups the previously orphaned
 // operational pages under one destination.
 const ADMIN_TAB: Tab = {
-  href: '/audit',
+  href: '/admin',
   label: 'Admin',
-  match: p => p.startsWith('/audit') || p.startsWith('/connectors') || p.startsWith('/integrations'),
+  match: p => p.startsWith('/admin') || p.startsWith('/audit')
+    || p.startsWith('/connectors') || p.startsWith('/integrations'),
 };
 
 export function AppHeader({ brand, brands, canAdmin }: Props) {

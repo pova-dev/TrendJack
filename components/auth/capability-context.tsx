@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import type { Capability, Role } from '@/lib/auth/capabilities';
+import type { Capability, Role } from '@/lib/auth/role-data';
 
 // What the signed-in user may do, available to any client component.
 //

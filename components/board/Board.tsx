@@ -7,6 +7,8 @@ import { applyColumnFilter, assignTrendsToColumns } from '@/lib/columns';
 import { useBoardStream } from '@/lib/realtime/use-board-stream';
 import { createCoalescer } from '@/lib/realtime/coalesce';
 import { ColumnBuilder } from './ColumnBuilder';
+import { ViewTabs, MonitorDrawer } from './BoardViews';
+import { partitionColumns, VIEWS, type ViewId } from '@/lib/board-views';
 
 interface Props {
   initialBoard: BoardConfig;
@@ -34,6 +36,22 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
   }, []);
   const [tickAt, setTickAt] = React.useState<Date>(new Date());
   const [columnEditor, setColumnEditor] = React.useState<{ open: boolean; col?: ColumnConfig } | null>(null);
+
+  // Which of the three views is showing, and which monitor lane is expanded.
+  // Both are local rather than persisted: a view is where you are looking right
+  // now, not a setting, and restoring yesterday's view on load would be
+  // surprising.
+  const [viewId, setViewId] = React.useState<ViewId>('act');
+  const [openMonitorId, setOpenMonitorId] = React.useState<string | null>(null);
+
+  // Split once per board change. Monitors are excluded from the view columns
+  // entirely: they re-show trends the other columns already own, so leaving
+  // them inline meant a third of the width repeating what was already visible.
+  const { views, monitors } = React.useMemo(
+    () => partitionColumns(board.columns),
+    [board.columns],
+  );
+  const visibleColumns = views[viewId];
 
   // Refresh failure, surfaced instead of swallowed. Previously a dead API left
   // the board showing stale cards forever with nothing to indicate it had
@@ -175,13 +193,29 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
     e.preventDefault();
     setOverIdx(idx);
   }
+  /**
+   * Reorder, translating the drop position from the view back to the board.
+   *
+   * `idx` is a slot in the *visible* columns, but board.columns holds all
+   * thirteen including the monitors. Splicing at the view index would move a
+   * column to an unrelated position, and because the order also decides which
+   * column claims a trend first in the dedup phase, that silently changes what
+   * the board shows rather than just where a column sits.
+   */
   async function onDrop(idx: number) {
     if (!dragColId) return;
     const cols = board.columns.slice();
     const fromIdx = cols.findIndex(c => c.id === dragColId);
     if (fromIdx < 0) return;
+
+    // Anchor on the column currently occupying the target slot. Dropping past
+    // the last visible column anchors on the end of the board instead.
+    const anchor = visibleColumns[idx];
+    const boardIdx = anchor ? cols.findIndex(c => c.id === anchor.id) : cols.length;
+    if (boardIdx < 0) return;
+
     const [moved] = cols.splice(fromIdx, 1);
-    const insertAt = idx > fromIdx ? idx - 1 : idx;
+    const insertAt = boardIdx > fromIdx ? boardIdx - 1 : boardIdx;
     cols.splice(insertAt, 0, moved);
     const next = { ...board, columns: cols };
     setBoard(next);
@@ -211,12 +245,47 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
     [board.columns, trends],
   );
 
+  // Counts per view, so switching is an informed choice rather than a guess at
+  // where something is. Computed from the same assignments the columns render,
+  // so a tab can never claim a number the view does not show.
+  const viewCounts = React.useMemo(() => {
+    const out = {} as Record<ViewId, number>;
+    for (const v of VIEWS) {
+      out[v.id] = views[v.id].reduce(
+        (n, c) => n + (columnAssignments.get(c.id)?.length ?? 0), 0,
+      );
+    }
+    return out;
+  }, [views, columnAssignments]);
+
+  const monitorSummary = React.useMemo(
+    () => monitors.map(c => ({
+      id: c.id,
+      title: c.title,
+      type: c.type,
+      count: columnAssignments.get(c.id)?.length ?? 0,
+    })),
+    [monitors, columnAssignments],
+  );
+
+  const openMonitor = monitors.find(c => c.id === openMonitorId) ?? null;
+
   // Board scroll container.
   //   Mobile (<sm): columns are full-screen-width with scroll-snap so
   //   swiping moves between exactly one column at a time.
-  //   Desktop (≥sm): traditional horizontal scroll, multiple columns visible.
+  //   Desktop (≥sm): the active view's columns share the width; with three or
+  //   four per view nothing scrolls sideways at all.
   return (
-    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden tj-scroll bg-ink-900 snap-x snap-mandatory sm:snap-none">
+    <div className="flex flex-col flex-1 h-full min-h-0 bg-ink-900">
+      <ViewTabs
+        active={viewId}
+        onChange={setViewId}
+        counts={viewCounts}
+        monitors={monitorSummary}
+        onOpenMonitor={setOpenMonitorId}
+      />
+
+      <div className="flex flex-1 min-h-0 overflow-x-auto overflow-y-hidden tj-scroll snap-x snap-mandatory sm:snap-none">
       {refreshError && (
         <div
           role="status"
@@ -225,7 +294,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           Showing last known data. {refreshError}
         </div>
       )}
-      {board.columns.map((col, idx) => (
+      {visibleColumns.map((col, idx) => (
         <React.Fragment key={col.id}>
           {/* Drop slot before this column */}
           <DropSlot active={overIdx === idx && dragColId !== null}
@@ -234,7 +303,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           <div
             onDragOver={dragColId ? e => onDragOverIdx(idx + 1, e) : undefined}
             onDrop={dragColId ? () => onDrop(idx + 1) : undefined}
-            className="flex-shrink-0 snap-start sm:snap-align-none"
+            className="flex-shrink-0 sm:flex-1 sm:min-w-0 flex snap-start sm:snap-align-none"
           >
             <BoardColumn
               column={col}
@@ -252,8 +321,8 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           </div>
         </React.Fragment>
       ))}
-      <DropSlot active={overIdx === board.columns.length && dragColId !== null}
-        onDragOver={e => onDragOverIdx(board.columns.length, e)} onDrop={() => onDrop(board.columns.length)} />
+      <DropSlot active={overIdx === visibleColumns.length && dragColId !== null}
+        onDragOver={e => onDragOverIdx(visibleColumns.length, e)} onDrop={() => onDrop(visibleColumns.length)} />
       <button
         onClick={() => setColumnEditor({ open: true })}
         className="flex-shrink-0 w-12 hover:bg-ink-800 border-r border-ink-700/60 flex items-center justify-center text-ink-500 hover:text-flare-400"
@@ -261,6 +330,16 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
       >
         +
       </button>
+      </div>
+
+      <MonitorDrawer
+        column={openMonitor}
+        trends={openMonitor ? (columnAssignments.get(openMonitor.id) ?? []) : []}
+        onClose={() => setOpenMonitorId(null)}
+        onOpenTrend={id => { setOpenMonitorId(null); setActiveId(id); }}
+        onAction={onAction}
+      />
+
       <DetailDrawer trend={active} open={!!active} onClose={() => setActiveId(null)} onAction={onAction} />
       {columnEditor?.open && (
         <ColumnBuilder
