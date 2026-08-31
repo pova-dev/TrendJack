@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { requireBrand } from '@/lib/auth';
-import { getBrand, listBrandsForOrg } from '@/lib/store';
+import { getBrand } from '@/lib/store';
 import { getOrgCredentials } from '@/lib/credentials';
 import { prisma } from '@/lib/db';
-import { TopBar } from '@/components/shell/TopBar';
 import { listAccounts } from '@/lib/social/store';
 import { buildDailyBrief, type AccountSeries } from '@/lib/social/analytics';
 import { SocialDashboard } from '@/components/social/SocialDashboard';
@@ -22,8 +21,7 @@ export default async function SocialPage() {
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
 
-  const [brands, accounts, creds, raw] = await Promise.all([
-    listBrandsForOrg(ctx.org!.id),
+  const [accounts, creds, raw] = await Promise.all([
     listAccounts(brand.id),
     getOrgCredentials(ctx.org!.id),
     prisma.socialAccount.findMany({
@@ -73,12 +71,6 @@ export default async function SocialPage() {
 
   return (
     <>
-      <TopBar
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-        trendCount={accounts.length}
-        postNowCount={brief.opportunities.length}
-      />
       <div className="flex-1 overflow-y-auto">
         {/* pb-24 clears the floating AI co-pilot pill, which otherwise sits on
             top of the last table row on desktop and covers a whole opportunity

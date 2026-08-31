@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { getBrand, listBrandsForOrg, listTrends } from '@/lib/store';
-import { TopBar } from '@/components/shell/TopBar';
+import { getBrand, listTrends } from '@/lib/store';
 import { RecommendationBadge } from '@/components/trend/RecommendationBadge';
 import { ScoreChip } from '@/components/trend/ScoreChip';
 import { Chip } from '@/components/ui/Chip';
@@ -12,7 +11,6 @@ export default async function QueuePage() {
   const ctx = await requireBrand();
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
-  const brands = await listBrandsForOrg(ctx.org!.id);
 
   const all = await listTrends(brand.id, {});
   const candidates = all
@@ -21,12 +19,6 @@ export default async function QueuePage() {
 
   return (
     <>
-      <TopBar
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-        trendCount={candidates.length}
-        postNowCount={candidates.filter(t => t.recommendation === 'POST_NOW').length}
-      />
       <div className="flex-1 overflow-y-auto p-6">
         <h1 className="text-xl font-semibold text-ink-100 mb-1">Draft queue</h1>
         <p className="text-sm text-ink-300 mb-6">

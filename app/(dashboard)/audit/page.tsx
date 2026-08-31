@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { requireUser } from '@/lib/auth';
-import { getBrand, listBrandsForOrg } from '@/lib/store';
-import { TopBar } from '@/components/shell/TopBar';
+import { getBrand } from '@/lib/store';
 import { prisma } from '@/lib/db';
 import { Chip } from '@/components/ui/Chip';
 import { relTime } from '@/lib/utils';
@@ -10,7 +9,6 @@ export default async function AuditPage() {
   const ctx = await requireUser();
   if (!ctx.org) return null;
   const brand = ctx.brand ? await getBrand(ctx.brand.id) : null;
-  const brands = await listBrandsForOrg(ctx.org.id);
   const logs = await prisma.auditLog.findMany({
     where: { orgId: ctx.org.id },
     orderBy: { createdAt: 'desc' },
@@ -20,14 +18,6 @@ export default async function AuditPage() {
 
   return (
     <>
-      {brand && (
-        <TopBar
-          brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-          brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-          trendCount={0}
-          postNowCount={0}
-        />
-      )}
       <div className="flex-1 overflow-y-auto p-6 max-w-4xl">
         <h1 className="text-xl font-semibold text-ink-100 mb-1">Audit log</h1>
         <p className="text-sm text-ink-300 mb-5">Last 200 events across the org. Read-only.</p>

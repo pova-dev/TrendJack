@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { AppShell } from '@/components/shell/AppShell';
 import { requireUser } from '@/lib/auth';
+import { listBrandsForOrg } from '@/lib/store';
+import { can } from '@/lib/auth/capabilities';
 import { redirect } from 'next/navigation';
 import { startIngestCron } from '@/lib/cron';
 import { bootAgents } from '@/lib/agents-boot';
@@ -38,5 +40,27 @@ void initRealtime();
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();
   if (!ctx.brand) redirect('/onboard');
-  return <AppShell user={{ name: ctx.user.name ?? ctx.user.email, email: ctx.user.email }}>{children}</AppShell>;
+
+  // Fetched once here rather than in each page. Every page needs the brand
+  // list to draw a header, and making that a per-page job is why eight pages
+  // ended up with no header at all.
+  const brands = await listBrandsForOrg(ctx.org!.id);
+
+  // Resolved server-side from the capability matrix, so the Admin tab is
+  // absent for roles that cannot use it rather than merely hidden.
+  const canAdmin = can(ctx.role, 'org:admin') || can(ctx.role, 'member:manage');
+
+  const shape = (b: { id: string; name: string; category: string; crisisMode?: boolean }) =>
+    ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode });
+
+  return (
+    <AppShell
+      user={{ name: ctx.user.name ?? ctx.user.email, email: ctx.user.email }}
+      brand={shape(ctx.brand)}
+      brands={brands.map(shape)}
+      canAdmin={canAdmin}
+    >
+      {children}
+    </AppShell>
+  );
 }

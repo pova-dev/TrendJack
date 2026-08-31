@@ -1,12 +1,11 @@
 import * as React from 'react';
-import { listTrends, getDefaultBoard, getBrand, listBrandsForOrg } from '@/lib/store';
+import { listTrends, getDefaultBoard, getBrand } from '@/lib/store';
 import { listConnectors, listConnectorOverview } from '@/lib/connectors';
 import { Board } from '@/components/board/Board';
-import { TopBar } from '@/components/shell/TopBar';
 import { ConnectorStatusBar } from '@/components/shell/ConnectorStatusBar';
 import { AiSetupBanner } from '@/components/shell/AiSetupBanner';
 import { requireBrand } from '@/lib/auth';
-import { AddColumnButton } from '@/components/shell/AddColumnButton';
+import { BoardHeaderSlot } from '@/components/shell/BoardHeaderSlot';
 import { GuidedTour } from '@/components/shell/GuidedTour';
 import { PendingPlansToast } from '@/components/shell/PendingPlansToast';
 import { getOrgCredentials } from '@/lib/credentials';
@@ -18,9 +17,8 @@ export default async function DashboardPage() {
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
 
-  const [board, brands, trends, creds] = await Promise.all([
+  const [board, trends, creds] = await Promise.all([
     getDefaultBoard(brand.id, ctx.user.id),
-    listBrandsForOrg(ctx.org!.id),
     listTrends(brand.id, { excludeDismissed: true, limit: 200 }),
     getOrgCredentials(ctx.org!.id),
   ]);
@@ -79,11 +77,10 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <AddColumnButton
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
+      <BoardHeaderSlot
         trendCount={trends.length}
         postNowCount={postNowCount}
+        liveAt={cronLastRunAt}
       />
       <AiSetupBanner configured={aiConfigured} />
       <Board initialBoard={board} initialTrends={trends} brandId={brand.id} />

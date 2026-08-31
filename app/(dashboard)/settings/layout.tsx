@@ -1,8 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { TopBar } from '@/components/shell/TopBar';
 import { requireBrand } from '@/lib/auth';
-import { getBrand, listBrandsForOrg } from '@/lib/store';
+import { getBrand } from '@/lib/store';
 import { SettingsNav } from '@/components/settings/SettingsNav';
 
 // Unified settings shell: a sidebar on the left listing every config
@@ -15,16 +14,9 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   const ctx = await requireBrand();
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
-  const brands = await listBrandsForOrg(ctx.org!.id);
 
   return (
     <>
-      <TopBar
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-        trendCount={0}
-        postNowCount={0}
-      />
       {/* flex-col on mobile so SettingsNav's mobile chip strip renders
           as a horizontal strip ABOVE content (not as a vertical bar
           to the LEFT, which was Round 4's P0 regression). flex-row

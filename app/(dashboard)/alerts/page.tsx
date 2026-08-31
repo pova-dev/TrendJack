@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { getBrand, listBrandsForOrg } from '@/lib/store';
-import { TopBar } from '@/components/shell/TopBar';
+import { getBrand } from '@/lib/store';
 import { Chip } from '@/components/ui/Chip';
 import { requireBrand } from '@/lib/auth';
 
@@ -15,16 +14,9 @@ export default async function AlertsPage() {
   const ctx = await requireBrand();
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
-  const brands = await listBrandsForOrg(ctx.org!.id);
 
   return (
     <>
-      <TopBar
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-        trendCount={0}
-        postNowCount={0}
-      />
       <div className="flex-1 overflow-y-auto p-6 max-w-4xl">
         <h1 className="text-xl font-semibold text-ink-100 mb-1">Alert rules</h1>
         <p className="text-sm text-ink-300 mb-3">Threshold-based. Prioritized P0–P3.</p>

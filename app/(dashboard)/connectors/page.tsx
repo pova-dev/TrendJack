@@ -1,10 +1,9 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { listConnectorOverview } from '@/lib/connectors';
-import { getBrand, listBrandsForOrg } from '@/lib/store';
+import { getBrand } from '@/lib/store';
 import { sourceLabel } from '@/components/trend/SourceIcon';
 import { Chip } from '@/components/ui/Chip';
-import { TopBar } from '@/components/shell/TopBar';
 import { requireBrand } from '@/lib/auth';
 import { listCredentials, getOrgCredentials } from '@/lib/credentials';
 import { CredentialEditor } from '@/components/connectors/CredentialEditor';
@@ -47,7 +46,6 @@ export default async function ConnectorsPage() {
   const ctx = await requireBrand();
   const brand = await getBrand(ctx.brand.id);
   if (!brand) return null;
-  const brands = await listBrandsForOrg(ctx.org!.id);
   const credList = await listCredentials(ctx.org!.id);
   // Re-resolve overview with org creds in mind by injecting into env briefly?
   // Simpler: pass the cred list to the page and decorate availability there.
@@ -57,12 +55,6 @@ export default async function ConnectorsPage() {
 
   return (
     <>
-      <TopBar
-        brand={{ id: brand.id, name: brand.name, category: brand.category, crisisMode: brand.crisisMode }}
-        brands={brands.map(b => ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode }))}
-        trendCount={0}
-        postNowCount={0}
-      />
       <div className="flex-1 overflow-y-auto p-6 max-w-5xl space-y-5">
         <header>
           <h1 className="text-xl font-semibold text-ink-100 mb-1">Connectors</h1>
