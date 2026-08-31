@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { deleteWithStepUp } from '@/lib/client/step-up';
+import { Can } from '@/components/auth/capability-context';
 
 interface CredItem { key: string; mask: string }
 interface KeySpec { key: string; label?: string; placeholder?: string; helper?: string; secret?: boolean }
@@ -96,9 +97,11 @@ export function CredentialEditor({ title, subtitle, keys, initial, rightSlot }: 
                   {savedKey === spec.key ? '✓' : 'Save'}
                 </Button>
                 {set && (
-                  <Button size="xs" variant="ghost" disabled={busyKey === spec.key} className="text-signal-red" onClick={() => remove(spec.key)}>
-                    Remove
-                  </Button>
+                  <Can capability="resource:delete">
+                    <Button size="xs" variant="ghost" disabled={busyKey === spec.key} className="text-signal-red" onClick={() => remove(spec.key)}>
+                      Remove
+                    </Button>
+                  </Can>
                 )}
               </div>
               {spec.helper && <p className="text-[10px] text-ink-400 ml-44 pl-1">{spec.helper}</p>}

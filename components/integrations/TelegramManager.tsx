@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { deleteWithStepUp } from '@/lib/client/step-up';
+import { Can } from '@/components/auth/capability-context';
 
 interface TgConn {
   id: string; name: string; defaultChatId: string;
@@ -99,7 +100,9 @@ export function TelegramManager({ initial }: { initial: TgConn[] }) {
                 <span className="text-2xs font-mono text-ink-400">chat <span className="text-ink-200">{c.defaultChatId}</span></span>
                 <span className="text-2xs font-mono text-ink-400">token <span className="text-ink-200">{c.botTokenMasked}</span></span>
                 <span className="ml-auto text-2xs text-ink-300">{c.events.length} events</span>
-                <Button size="xs" variant="ghost" className="text-signal-red" onClick={() => remove(c.id)}>Remove</Button>
+                <Can capability="resource:delete">
+                  <Button size="xs" variant="ghost" className="text-signal-red" onClick={() => remove(c.id)}>Remove</Button>
+                </Can>
               </li>
             ))}
           </ul>

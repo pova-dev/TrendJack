@@ -7,6 +7,7 @@ import { LiveCounter, compact } from './LiveCounter';
 import { AddAccountForm } from './AddAccountForm';
 import { PlatformGlyph, platformLabel } from './PlatformGlyph';
 import { deleteWithStepUp } from '@/lib/client/step-up';
+import { Can } from '@/components/auth/capability-context';
 
 /** Refresh cadence for the counters. Matches the server poll interval — no
  *  point asking more often than the data can change. */
@@ -135,7 +136,9 @@ function AccountCard({ a, onChange }: { a: AccountView; onChange: () => void }) 
             <div className="text-2xs font-mono text-ink-400 truncate">@{a.handle}</div>
           </div>
         </div>
-        <RemoveButton id={a.id} onRemoved={onChange} />
+        <Can capability="resource:delete">
+          <RemoveButton id={a.id} onRemoved={onChange} />
+        </Can>
       </div>
 
       {a.lastError ? (

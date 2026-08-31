@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { AppShell } from '@/components/shell/AppShell';
+import { CapabilityProvider } from '@/components/auth/capability-context';
 import { requireUser } from '@/lib/auth';
 import { listBrandsForOrg } from '@/lib/store';
-import { can } from '@/lib/auth/capabilities';
+import { can, capabilitiesFor, type Role } from '@/lib/auth/capabilities';
 import { redirect } from 'next/navigation';
 import { startIngestCron } from '@/lib/cron';
 import { bootAgents } from '@/lib/agents-boot';
@@ -50,6 +51,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // absent for roles that cannot use it rather than merely hidden.
   const canAdmin = can(ctx.role, 'org:admin') || can(ctx.role, 'member:manage');
 
+  // The full set goes to the client so controls the user cannot use are not
+  // rendered at all. Server-side guards still re-check every request; this
+  // only stops the UI offering actions that would be refused.
+  const capabilities = capabilitiesFor(ctx.role);
+
   const shape = (b: { id: string; name: string; category: string; crisisMode?: boolean }) =>
     ({ id: b.id, name: b.name, category: b.category, crisisMode: b.crisisMode });
 
@@ -60,7 +66,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       brands={brands.map(shape)}
       canAdmin={canAdmin}
     >
-      {children}
+      <CapabilityProvider capabilities={capabilities} role={(ctx.role ?? null) as Role | null}>
+        {children}
+      </CapabilityProvider>
     </AppShell>
   );
 }

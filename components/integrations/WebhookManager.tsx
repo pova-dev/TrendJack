@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { deleteWithStepUp } from '@/lib/client/step-up';
+import { Can } from '@/components/auth/capability-context';
 
 interface Webhook { id: string; name: string; url: string; events: string[]; active: boolean }
 
@@ -91,7 +92,9 @@ export function WebhookManager({ initial }: { initial: Webhook[] }) {
                 <span className="text-sm text-ink-100 truncate">{h.name}</span>
                 <span className="text-2xs font-mono text-ink-400 truncate">{h.url}</span>
                 <span className="ml-auto text-2xs text-ink-300">{h.events.length} events</span>
-                <Button size="xs" variant="ghost" className="text-signal-red" onClick={() => remove(h.id)}>Remove</Button>
+                <Can capability="resource:delete">
+                  <Button size="xs" variant="ghost" className="text-signal-red" onClick={() => remove(h.id)}>Remove</Button>
+                </Can>
               </li>
             ))}
           </ul>

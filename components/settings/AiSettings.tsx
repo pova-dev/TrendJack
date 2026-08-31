@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { deleteWithStepUp } from '@/lib/client/step-up';
+import { Can } from '@/components/auth/capability-context';
 
 interface CredItem { id: string; scope: string; key: string; mask: string; updatedAt: string }
 
@@ -171,8 +172,10 @@ export function AiSettings({ initial }: { initial: CredItem[] }) {
                       {savedKey === p.envKey ? 'Saved ✓' : 'Save'}
                     </Button>
                     {set && (
-                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => remove(p.envKey)}
-                              className="text-signal-red">Remove</Button>
+                      <Can capability="resource:delete">
+                        <Button variant="ghost" size="sm" disabled={busy} onClick={() => remove(p.envKey)}
+                                className="text-signal-red">Remove</Button>
+                      </Can>
                     )}
                   </div>
                   <p className="text-2xs text-ink-500 mt-1">Stored encrypted (AES-256-GCM) per org. Never sent to the browser unmasked.</p>
