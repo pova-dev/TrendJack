@@ -32,7 +32,10 @@ export function LeftRail({ user }: { user: { name: string; email: string } }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   return (
-    <nav className="flex flex-col w-[60px] border-r border-ink-700 bg-ink-950 py-3 relative">
+    // Hidden below md. On a 390px phone the rail consumed 60px of chrome plus
+    // its border for icons that duplicate the header's section menu exactly,
+    // which is a sixth of the viewport spent on redundant navigation.
+    <nav className="hidden md:flex flex-col w-[60px] border-r border-ink-700 bg-ink-950 py-3 relative">
       <Link href="/" aria-label="TrendJack home"
         className="flex items-center justify-center w-11 h-11 mx-auto mb-4 bg-flare-500 text-ink-950 rounded-lg font-bold text-sm hover:bg-flare-400 transition-colors">
         TJ

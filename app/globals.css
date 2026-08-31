@@ -106,6 +106,37 @@ html, body {
   }
 }
 
+/* Scrolling.
+   Momentum on touch, and anchored so content arriving above the viewport
+   does not shove what the user is reading. The board polls every 90s and
+   prepends new signals, which without this yanks the column mid-read.
+   Guarded by the reduced-motion block above. */
+html { scroll-behavior: smooth; }
+.tj-scroll,
+[data-scroll] {
+  -webkit-overflow-scrolling: touch;
+  overflow-anchor: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Staggered entry. Applied to a container; its children arrive in sequence.
+   Capped at eight because beyond roughly 300ms of total stagger the last
+   item reads as lag rather than choreography. */
+.tj-stagger > * { animation: rise 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.tj-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.tj-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.tj-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.tj-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.tj-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.tj-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.tj-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.tj-stagger > *:nth-child(n+8) { animation-delay: 280ms; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* Scrollbar — slim, theme-aware. */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }

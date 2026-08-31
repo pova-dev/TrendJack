@@ -331,7 +331,7 @@ export function BoardColumn({
         )}
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto divide-y divide-ink-800/70">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto tj-scroll divide-y divide-ink-800/70">
         {sortedTrends.length === 0 && (
           <div className="px-6 py-12 text-center">
             <div className="w-8 h-8 mx-auto mb-3 rounded-full border border-dashed border-ink-600" aria-hidden="true" />

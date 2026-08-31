@@ -68,28 +68,39 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
 
         <div className="hidden md:block h-5 w-px bg-ink-700" />
 
-        {/* Desktop tabs. */}
-        <nav aria-label="Sections" className="hidden md:flex items-center gap-0.5 min-w-0">
+        {/* Navigation never compresses or wraps. It is the one thing in the bar
+            that must always be usable, so everything else yields to it. */}
+        <nav aria-label="Sections" className="hidden md:flex items-center gap-0.5 shrink-0">
           {tabs.map(t => (
             <TabLink key={t.href} tab={t} active={t === active} />
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* min-w-0 lets this cluster shrink rather than push the tabs off the
+            bar. Without it the status chips overran the Admin tab at 1440px,
+            which is the width most laptops actually run. */}
+        <div className="ml-auto flex items-center gap-2 min-w-0 justify-end">
           {/* Crisis is the one status that must never be hidden, at any width. */}
           {brand.crisisMode ? (
             <Chip tone="bad">CRISIS</Chip>
           ) : (
-            <Chip tone="good" className="hidden sm:inline-flex">
+            <Chip tone="good" className="hidden 2xl:inline-flex shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-signal-green animate-pulse-slow inline-block mr-1" />
               live
             </Chip>
           )}
 
-          <div className="hidden md:flex items-center gap-2">
+          {/* Progressive disclosure by width, ordered by how much each earns
+              its space. Counts and freshness are glanceable extras; the
+              controls are the reason the bar exists, so they never drop. */}
+          <div className="hidden xl:flex items-center gap-2 min-w-0 shrink">
             <Metrics slot={slot} />
+          </div>
+          <div className="hidden 2xl:flex items-center gap-2 shrink-0">
             <FreshnessPill />
             <LastTick iso={slot.liveAt} />
+          </div>
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <RefreshButton />
             <ThemeToggle />
             {slot.onAddColumn && (

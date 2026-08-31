@@ -78,8 +78,31 @@ const config: Config = {
         'col': '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4)',
         'pop': '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)',
       },
+      keyframes: {
+        // Entry motion. 8px is deliberately small: the job is to signal that
+        // content arrived, not to perform. Anything larger reads as a slide
+        // transition and gets tiring on a page opened many times a day.
+        rise: {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        fade: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+      },
       animation: {
         'pulse-slow': 'pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        // Decelerating curve, so it arrives rather than stops. `backwards`
+        // holds the from-state during the stagger delay, otherwise a delayed
+        // element flashes at full opacity before starting.
+        rise: 'rise 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+        fade: 'fade 260ms ease-out backwards',
+      },
+      transitionTimingFunction: {
+        // One easing for interaction across the app. Mixed ad-hoc curves are
+        // most of why an interface feels assembled rather than designed.
+        out: 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },

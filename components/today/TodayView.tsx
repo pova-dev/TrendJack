@@ -16,8 +16,11 @@ export function TodayView({ brief, brandName }: { brief: TodayBrief; brandName: 
   const hasDecisions = brief.actNow.length > 0 || brief.closingSoon.length > 0;
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
+    <div className="flex-1 overflow-y-auto tj-scroll">
+      {/* pb-28 on mobile keeps the last card clear of the fixed co-pilot pill,
+          which otherwise sits on top of it until the user scrolls.
+          tj-stagger sequences the direct children in on load. */}
+      <div className="tj-stagger mx-auto w-full max-w-5xl px-4 sm:px-6 py-6 sm:py-8 pb-28 sm:pb-10">
         <Greeting brandName={brandName} signals={brief.counts.totalSignals} />
 
         {hasDecisions ? (
@@ -111,8 +114,12 @@ function DecisionRow({ item, rank }: { item: TodayBrief['actNow'][number]; rank?
       <Link
         href={`/board?trend=${item.trend.id}`}
         className={cn(
-          'group flex gap-3 rounded-lg border border-ink-700 bg-ink-850 p-3 sm:p-4',
-          'hover:border-ink-600 hover:bg-ink-800 transition-colors',
+          'group relative flex gap-3 rounded-lg border border-ink-700 bg-ink-850 p-3 sm:p-4',
+          // Lifts a hair on hover rather than only changing colour. The
+          // displacement is what makes a row feel like an object worth
+          // clicking; colour alone reads as a highlight.
+          'motion-safe:transition-all duration-200 ease-out',
+          'hover:border-ink-600 hover:bg-ink-800 hover:-translate-y-px hover:shadow-lg hover:shadow-black/5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400',
         )}
       >
@@ -239,7 +246,17 @@ function CompetitorCard({ brief }: { brief: TodayBrief }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-ink-700 bg-ink-850 p-4">
+    <section
+      className={cn(
+        'rounded-lg border border-ink-700 bg-ink-850 p-4',
+        // A hairline highlight along the top edge. It is the cheapest way to
+        // give a flat panel a light source, and without one a page of
+        // same-coloured rectangles reads as a wireframe.
+        'relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px',
+        'before:bg-gradient-to-r before:from-transparent before:via-ink-600/60 before:to-transparent',
+        'motion-safe:transition-shadow duration-200 hover:shadow-lg hover:shadow-black/5',
+      )}
+    >
       <h2 className="text-2xs font-mono uppercase tracking-widest text-ink-500">{title}</h2>
       <div className="mt-2.5">{children}</div>
     </section>

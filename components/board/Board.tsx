@@ -216,7 +216,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
   //   swiping moves between exactly one column at a time.
   //   Desktop (≥sm): traditional horizontal scroll, multiple columns visible.
   return (
-    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden bg-ink-900 snap-x snap-mandatory sm:snap-none">
+    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden tj-scroll bg-ink-900 snap-x snap-mandatory sm:snap-none">
       {refreshError && (
         <div
           role="status"
