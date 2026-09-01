@@ -32,6 +32,7 @@ interface Tab { href: string; label: string; match: (p: string) => boolean }
 const TABS: Tab[] = [
   { href: '/',        label: 'Today',   match: p => p === '/' },
   { href: '/board',   label: 'Board',   match: p => p.startsWith('/board') },
+  { href: '/stats',   label: 'Stats',   match: p => p.startsWith('/stats') },
   { href: '/social',  label: 'Social',  match: p => p.startsWith('/social') },
   { href: '/queue',   label: 'Queue',   match: p => p.startsWith('/queue') },
   { href: '/alerts',  label: 'Alerts',  match: p => p.startsWith('/alerts') },
