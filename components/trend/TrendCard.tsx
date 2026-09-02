@@ -169,7 +169,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
       {/* row 2 — title (always-visible inline link to original).
           Falls back to a per-source search URL when trend.url is missing,
           so the ↗ icon is never absent. */}
-      <h3 className="text-sm font-semibold text-ink-100 leading-snug line-clamp-1 mb-0.5 flex items-center gap-1.5">
+      <h3 className="text-sm font-semibold text-ink-100 leading-snug mb-0.5 flex items-center gap-1.5 min-w-0">
         <span className="truncate">{trend.title}</span>
         <a
           href={resolveSourceUrl(trend)}
@@ -199,7 +199,7 @@ export const TrendCard = React.memo(function TrendCard({ trend, active, onOpen, 
           when not present, we fall back to the recommendationReason
           which already carries the brand-fit / risk explanation. Click
           opens the drawer with the Lineage tab pre-focused. */}
-      <p className="text-xs text-ink-300/70 line-clamp-1 mb-0.5 flex items-center gap-1.5">
+      <p className="text-xs text-ink-300/70 mb-0.5 flex items-center gap-1.5 min-w-0">
         <span className="truncate">{displayLineage(trend.lineage)}</span>
         {/* Predictive Virality phase pill — only renders when forecastPeak
             has produced a result. Confidence-aware copy: "growing 60%",

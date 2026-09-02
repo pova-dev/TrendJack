@@ -193,8 +193,16 @@ export function BoardColumn({
         // board never scrolls sideways at whatever count a view holds, and
         // wider screens make columns more readable rather than merely showing
         // a fraction more of the next one.
-        'flex flex-col flex-shrink-0 sm:flex-shrink sm:flex-1',
-        'w-[calc(100vw-16px)] md:w-auto sm:min-w-[320px] sm:max-w-[560px]',
+        // Three widths, because one rule cannot serve all three shapes.
+        //   phone  : full viewport, snap-scrolled one column at a time.
+        //   tablet : fixed 320px and scroll. Three columns at a readable floor
+        //            is 960px, which does not fit 768px, so forcing them to
+        //            share only produces three unreadable columns and content
+        //            running off the right edge.
+        //   ≥lg    : flexible, sharing the width. This is where the whole view
+        //            genuinely fits and horizontal scrolling disappears.
+        'flex flex-col flex-shrink-0 lg:flex-shrink lg:flex-1',
+        'w-[calc(100vw-16px)] sm:w-[320px] lg:w-auto lg:min-w-[300px] lg:max-w-[560px]',
         'h-[calc(100%-12px)] my-1.5 mx-1',
         'rounded-lg bg-ink-900 border border-ink-700/70 overflow-hidden',
         'transition-[opacity,border-color] duration-150 hover:border-ink-600',

@@ -68,11 +68,11 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
           <BrandSwitcher current={brand} brands={brands} />
         </div>
 
-        <div className="hidden md:block h-5 w-px bg-ink-700" />
+        <div className="hidden lg:block h-5 w-px bg-ink-700" />
 
         {/* Navigation never compresses or wraps. It is the one thing in the bar
             that must always be usable, so everything else yields to it. */}
-        <nav aria-label="Sections" className="hidden md:flex items-center gap-0.5 shrink-0">
+        <nav aria-label="Sections" className="hidden lg:flex items-center gap-0.5 shrink-0">
           {tabs.map(t => (
             <TabLink key={t.href} tab={t} active={t === active} />
           ))}
@@ -102,7 +102,7 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
             <FreshnessPill />
             <LastTick iso={slot.liveAt} />
           </div>
-          <div className="hidden md:flex items-center gap-2 shrink-0">
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             <RefreshButton />
             <ThemeToggle />
             {slot.onAddColumn && (
@@ -113,7 +113,7 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
           {/* Mobile: one control for sections, one for everything else. */}
           <button
             onClick={() => { setNavOpen(v => !v); setOverflowOpen(false); }}
-            className="md:hidden flex items-center gap-1 h-11 px-2 rounded-md hover:bg-ink-800 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400"
+            className="lg:hidden flex items-center gap-1 h-11 px-2 rounded-md hover:bg-ink-800 text-sm text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400"
             aria-expanded={navOpen}
           >
             {active?.label ?? 'Menu'}
@@ -121,7 +121,7 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
           </button>
           <button
             onClick={() => { setOverflowOpen(v => !v); setNavOpen(false); }}
-            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-ink-800 text-ink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400"
+            className="lg:hidden flex items-center justify-center w-11 h-11 rounded-md hover:bg-ink-800 text-ink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400"
             aria-expanded={overflowOpen}
             aria-label="More controls"
           >
@@ -130,7 +130,7 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
         </div>
 
         {navOpen && (
-          <div className="md:hidden absolute right-2 top-12 z-30 w-52 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-1">
+          <div className="lg:hidden absolute right-2 top-12 z-30 w-52 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-1">
             {tabs.map(t => (
               <Link
                 key={t.href}
@@ -147,7 +147,7 @@ export function AppHeader({ brand, brands, canAdmin }: Props) {
         )}
 
         {overflowOpen && (
-          <div className="md:hidden absolute right-2 top-12 z-30 w-56 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-2 space-y-2">
+          <div className="lg:hidden absolute right-2 top-12 z-30 w-56 bg-ink-800 border border-ink-700 rounded-md shadow-pop p-2 space-y-2">
             <div className="px-1"><Metrics slot={slot} stacked /></div>
             <div className="flex items-center gap-2 px-1">
               <FreshnessPill />

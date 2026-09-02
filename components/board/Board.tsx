@@ -303,7 +303,7 @@ export function Board({ initialBoard, initialTrends, brandId }: Props) {
           <div
             onDragOver={dragColId ? e => onDragOverIdx(idx + 1, e) : undefined}
             onDrop={dragColId ? () => onDrop(idx + 1) : undefined}
-            className="flex-shrink-0 sm:flex-1 sm:min-w-0 flex snap-start sm:snap-align-none"
+            className="flex-shrink-0 lg:flex-1 lg:min-w-0 flex snap-start sm:snap-align-none"
           >
             <BoardColumn
               column={col}
