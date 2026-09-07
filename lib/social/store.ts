@@ -23,6 +23,11 @@ export interface AccountView {
   avatarUrl: string | null;
   isOwn: boolean;
   competitorName: string | null;
+  /** Removed by an operator. Kept rather than deleted so its history survives
+   *  a re-add, but it must stay visible or the account becomes unreachable:
+   *  the list hid it, the empty state then claimed no channels existed, and
+   *  there was no way to restore it from the UI. */
+  archived: boolean;
   lastPolledAt: string | null;
   lastError: string | null;
   /** Latest counter reading. Null until the first poll lands. */
@@ -49,10 +54,20 @@ export interface AccountView {
 
 const HISTORY_POINTS = 48; // 48 × 15min ≈ 12h of sparkline
 
+/**
+ * Every channel for the brand, archived ones included and flagged.
+ *
+ * Previously filtered on `active: true`, which made a removed account
+ * invisible. Since removal is a soft delete, those rows still existed and
+ * still counted elsewhere: the landing view reported "7 channels configured,
+ * all switched off" while this page said "No channels tracked yet". Both read
+ * the same table. Returning them flagged lets the UI show what is actually
+ * there and offer a way back.
+ */
 export async function listAccounts(brandId: string): Promise<AccountView[]> {
   const rows = await prisma.socialAccount.findMany({
-    where: { brandId, active: true },
-    orderBy: [{ isOwn: 'desc' }, { platform: 'asc' }, { competitorName: 'asc' }],
+    where: { brandId },
+    orderBy: [{ active: 'desc' }, { isOwn: 'desc' }, { platform: 'asc' }, { competitorName: 'asc' }],
     include: {
       samples: { orderBy: { sampledAt: 'desc' }, take: HISTORY_POINTS },
       posts: {
@@ -75,6 +90,7 @@ export async function listAccounts(brandId: string): Promise<AccountView[]> {
       avatarUrl: r.avatarUrl,
       isOwn: r.isOwn,
       competitorName: r.competitorName,
+      archived: !r.active,
       lastPolledAt: r.lastPolledAt?.toISOString() ?? null,
       lastError: r.lastError,
       followers: newest ? Number(newest.followers) : null,
@@ -130,6 +146,14 @@ export async function addAccount(input: AddAccountInput) {
       competitorName: input.competitorName ?? null,
     },
   });
+}
+
+/** Bring an archived channel back. The counterpart to removeAccount, without
+ *  which a removal is effectively permanent from the UI's point of view. */
+export async function restoreAccount(brandId: string, accountId: string) {
+  const existing = await prisma.socialAccount.findUnique({ where: { id: accountId } });
+  if (!existing || existing.brandId !== brandId) return null; // cross-tenant guard
+  return prisma.socialAccount.update({ where: { id: accountId }, data: { active: true } });
 }
 
 /** Soft-delete: keeps the sample history so re-adding restores the chart. */

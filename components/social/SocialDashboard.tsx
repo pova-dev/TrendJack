@@ -45,9 +45,18 @@ export function SocialDashboard({
     return () => clearInterval(t);
   }, [refresh]);
 
-  const own = accounts.filter(a => a.isOwn);
-  const rivals = accounts.filter(a => !a.isOwn);
+  // Archived channels are excluded from the working lists but not from the
+  // page. They were previously filtered out server-side, which made a removed
+  // channel unreachable and let the empty state claim none existed while seven
+  // sat in the table.
+  const live = accounts.filter(a => !a.archived);
+  const archived = accounts.filter(a => a.archived);
+  const own = live.filter(a => a.isOwn);
+  const rivals = live.filter(a => !a.isOwn);
 
+  // Only when nothing exists at all. An archived channel is still a channel,
+  // and telling someone they have none while offering no way to see the ones
+  // they had is the bug this replaced.
   if (accounts.length === 0) {
     return <EmptyState configured={configured} onAdded={refresh} />;
   }
@@ -75,7 +84,69 @@ export function SocialDashboard({
       <Section title="Add a channel">
         <AddAccountForm onAdded={refresh} />
       </Section>
+
+      {archived.length > 0 && (
+        <ArchivedSection rows={archived} onChange={refresh} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Channels an operator removed.
+ *
+ * Removal is a soft delete so the follower history survives, which is the
+ * right call. It only works if the row stays reachable: without this the
+ * account is gone from every screen and the only route back is retyping the
+ * exact handle and hoping the upsert matches.
+ */
+function ArchivedSection({ rows, onChange }: { rows: AccountView[]; onChange: () => void }) {
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function restore(id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/social/accounts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
+      if (res.ok) { onChange(); return; }
+      const body = await res.json().catch(() => ({}));
+      setError(body.message ?? 'Could not restore that channel.');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  return (
+    <Section title="Removed" note={`${rows.length} kept with ${rows.length === 1 ? 'its' : 'their'} history`}>
+      {error && (
+        <div role="alert" className="mb-2 rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-bad-300">
+          {error}
+        </div>
+      )}
+      <ul className="space-y-1.5">
+        {rows.map(a => (
+          <li key={a.id} className="flex items-center gap-3 rounded-md border border-ink-700 bg-ink-900/50 px-3 py-2">
+            <PlatformGlyph platform={a.platform} />
+            <span className="text-sm text-ink-300 truncate">
+              {a.displayName || a.competitorName || a.handle}
+            </span>
+            <span className="text-2xs font-mono text-ink-600 truncate">@{a.handle}</span>
+            <span className="ml-auto text-2xs font-mono text-ink-600 shrink-0">
+              {a.isOwn ? 'ours' : 'competitor'}
+            </span>
+            <button
+              type="button"
+              disabled={busy === a.id}
+              onClick={() => void restore(a.id)}
+              className="shrink-0 text-2xs font-mono text-flare-400 hover:text-flare-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flare-400 rounded px-2 py-1"
+            >
+              {busy === a.id ? 'restoring…' : 'restore'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 

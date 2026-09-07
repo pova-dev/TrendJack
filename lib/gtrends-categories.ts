@@ -21,7 +21,12 @@ export interface GtrendsCategory {
 }
 
 export const GTRENDS_CATEGORIES: GtrendsCategory[] = [
-  { id: 'top', label: 'Top stories',  helper: 'All categories — daily trending searches' },
+  // Not a category. It is every trending search in the market, so it arrives
+  // as national news, politics and sport regardless of what the brand sells.
+  // On POVA it was 92% of intake and produced almost nothing brand-relevant,
+  // which is worth warning about at the point of ticking rather than leaving
+  // to be discovered from the Stats page months later.
+  { id: 'top', label: 'Top stories',  helper: 'Everything trending in the market, not filtered to your category. High volume, mostly unrelated.' },
   { id: 't',   label: 'Sports',       helper: 'Cricket, football, scores, athletes' },
   { id: 'b',   label: 'Business',     helper: 'Markets, finance, deals' },
   { id: 'e',   label: 'Entertainment',helper: 'Films, music, celebs, streaming' },

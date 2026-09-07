@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireBrand } from '@/lib/auth';
-import { addAccount, isPlatform, listAccounts, removeAccount } from '@/lib/social/store';
+import { addAccount, isPlatform, listAccounts, removeAccount, restoreAccount } from '@/lib/social/store';
 import { requireCapability, guardErrorResponse } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
@@ -52,5 +52,25 @@ export async function DELETE(req: Request) {
 
   const removed = await removeAccount(ctx.brand.id, id);
   if (!removed) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * Restore an archived channel.
+ *
+ * Gated on social:manage rather than resource:delete. Bringing a channel back
+ * is a configuration change, not a destructive one, and requiring an emailed
+ * code to undo a removal would make the undo harder than the removal was.
+ */
+export async function PATCH(req: Request) {
+  try { await requireCapability('social:manage'); }
+  catch (e) { const denied = guardErrorResponse(e); if (denied) return denied; throw e; }
+
+  const ctx = await requireBrand();
+  const id = new URL(req.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+  const restored = await restoreAccount(ctx.brand.id, id);
+  if (!restored) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
